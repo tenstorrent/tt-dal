@@ -1,0 +1,15 @@
+---
+BasedOnStyle: LLVM
+AlignArrayOfStructures: Left
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments: true
+ColumnLimit: 80
+Cpp11BracedListStyle: false
+IndentCaseLabels: true
+AlignAfterOpenBracket: BlockIndent
+BinPackArguments: false
+BinPackParameters: false
+IndentWidth: 4
+InsertBraces: false
