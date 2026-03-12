@@ -63,7 +63,10 @@ See the public header for complete API documentation.
 ## Organization
 
 The repository is organized as a pure C library. CMake is used as the build
-system.
+system. Rust bindings are available via the `ttdal` crate at
+[`bind/rs/`][bind:rs].
+
+[bind:rs]: /bind/rs/README.md
 
 ```
 ./
@@ -71,6 +74,8 @@ system.
 ├── DESIGN.md        # design philosophy
 ├── README.md        # this document
 ├── ...
+├── bind/            # language bindings
+│   └── rs/          # rust crate
 ├── include/         # public interface
 └── src/             # core implementation
     └── lib.c        # main library

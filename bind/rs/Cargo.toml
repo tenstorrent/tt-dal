@@ -1,0 +1,21 @@
+[package]
+name = "ttdal"
+version = { workspace = true }
+edition = "2024"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pci = { path = "crates/pci" }
+semver = "1.0.27"
+ttdal-sys = { workspace = true }
+
+[workspace]
+members = [
+    "crates/*",
+    "sys",
+]
+
+[workspace.package]
+version = "0.1.0"
