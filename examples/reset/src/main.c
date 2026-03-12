@@ -72,10 +72,7 @@ int main(int argc, char *argv[]) {
     for (int i = optind; i < argc; i++) {
         if (ndevs >= MAX_DEVS) {
             fprintf(
-                stderr,
-                "%s: error: too many devices (max %d)\n",
-                prog,
-                MAX_DEVS
+                stderr, "%s: error: too many devices (max %d)\n", prog, MAX_DEVS
             );
             return 1;
         }
