@@ -113,3 +113,18 @@ pub(crate) fn check(ret: core::ffi::c_int) -> Result<()> {
         Err(Error::last_error())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_zero() {
+        assert!(check(0).is_ok());
+    }
+
+    #[test]
+    fn check_nonzero() {
+        assert!(check(-1).is_err());
+    }
+}

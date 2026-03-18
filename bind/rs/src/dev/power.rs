@@ -120,3 +120,62 @@ impl Session {
         err::check(unsafe { ffi::tt_power(self.as_ptr(), raw) })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serial_test::serial;
+
+    use super::*;
+
+    #[test]
+    fn flagset_lo() {
+        assert_eq!(FlagSet::LO.0, 0);
+    }
+
+    #[test]
+    fn flagset_hi() {
+        assert_eq!(FlagSet::HI.0, !0u16);
+    }
+
+    #[test]
+    fn flagset_default() {
+        assert_eq!(FlagSet::default(), FlagSet::LO);
+    }
+
+    #[test]
+    fn flagset_from_flag() {
+        let fs = FlagSet::from(Flag::MaxAiClk);
+        assert_eq!(fs.0, Flag::MaxAiClk as u16);
+    }
+
+    #[test]
+    fn flagset_from_array() {
+        let fs = FlagSet::from([Flag::MaxAiClk, Flag::TensixEnable]);
+        assert_eq!(fs.0, Flag::MaxAiClk as u16 | Flag::TensixEnable as u16);
+    }
+
+    #[test]
+    fn flagset_from_iter() {
+        let flags = [Flag::MriscPhyWakeup, Flag::L2CpuEnable];
+        let fs: FlagSet = flags.into_iter().collect();
+        assert_eq!(fs.0, Flag::MriscPhyWakeup as u16 | Flag::L2CpuEnable as u16);
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn request_power_hi() {
+        crate::tests::open()
+            .request_power(FlagSet::HI)
+            .expect("request_power HI failed");
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn request_power_lo() {
+        crate::tests::open()
+            .request_power(FlagSet::LO)
+            .expect("request_power LO failed");
+    }
+}

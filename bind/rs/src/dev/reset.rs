@@ -42,3 +42,15 @@ impl Session {
         err::check(unsafe { ffi::tt_reset(self.as_mut_ptr()) })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serial_test::serial;
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn reset_smoke() {
+        crate::tests::open().reset().expect("reset failed");
+    }
+}
