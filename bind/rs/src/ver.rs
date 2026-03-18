@@ -75,8 +75,9 @@ pub fn firmware(dev: &Session) -> Result<Version> {
 
 #[cfg(test)]
 mod tests {
+    use serial_test::serial;
+
     use super::*;
-    use crate::Device;
 
     #[test]
     fn library_matches_cargo() {
@@ -89,19 +90,19 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
+    #[serial]
     fn driver_version() {
         assert!(Version::new(2, 7, 0) <= driver().expect("driver version failed"));
     }
 
     #[test]
+    #[ignore]
+    #[serial]
     fn firmware_version() {
-        let dev = Device::scan()
-            .expect("device scan failed")
-            .into_iter()
-            .next()
-            .expect("no device found")
-            .open()
-            .expect("device open failed");
-        assert!(Version::new(19, 0, 0) <= firmware(&dev).expect("firmware version failed"));
+        assert!(
+            Version::new(19, 0, 0)
+                <= firmware(&crate::tests::open()).expect("firmware version failed")
+        );
     }
 }

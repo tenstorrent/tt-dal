@@ -48,3 +48,15 @@ pub enum Arch {
 pub use self::dev::Device;
 #[doc(inline)]
 pub use self::err::{Error, Result};
+
+#[cfg(test)]
+pub(crate) mod tests {
+    pub fn open() -> crate::dev::Session {
+        crate::dev::Device::scan()
+            .expect("device scan failed")
+            .next()
+            .expect("no device found")
+            .open()
+            .expect("device open failed")
+    }
+}

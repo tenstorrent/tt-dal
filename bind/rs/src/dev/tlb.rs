@@ -190,3 +190,85 @@ impl Session {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serial_test::serial;
+
+    use super::*;
+
+    #[test]
+    fn size_nonzero() {
+        assert!(Size::Mb1 as u64 > 0);
+        assert!(Size::Mb2 as u64 > 0);
+        assert!(Size::Mb16 as u64 > 0);
+        assert!(Size::Gb4 as u64 > 0);
+    }
+
+    #[test]
+    fn caching_distinct() {
+        assert_ne!(Caching::Uncached as u32, Caching::WriteCombined as u32);
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn alloc_smoke() {
+        let dev = crate::tests::open();
+        let _tlb = dev
+            .alloc(Size::Mb2, Caching::WriteCombined)
+            .expect("alloc failed");
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn bind_smoke() {
+        let dev = crate::tests::open();
+        let mut tlb = dev
+            .alloc(Size::Mb2, Caching::WriteCombined)
+            .expect("alloc failed");
+        let cfg = Config {
+            addr: 0,
+            x_end: 0,
+            y_end: 0,
+            x_start: 0,
+            y_start: 0,
+            noc: 0,
+            mcast: false,
+            linked: false,
+            static_vc: 0,
+        };
+        let win = tlb.bind(&cfg).expect("bind failed");
+        assert!(win.size() > 0);
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn read_write() {
+        let dev = crate::tests::open();
+        let mut tlb = dev
+            .alloc(Size::Mb2, Caching::Uncached)
+            .expect("alloc failed");
+        let cfg = Config {
+            addr: 0,
+            x_end: 0,
+            y_end: 0,
+            x_start: 0,
+            y_start: 0,
+            noc: 0,
+            mcast: false,
+            linked: false,
+            static_vc: 0,
+        };
+        let win = tlb.bind(&cfg).expect("bind failed");
+        // Read a u32, write the same value back, then read again: a no-op
+        // round-trip that exercises both volatile paths without corrupting
+        // state.
+        let val: u32 = unsafe { win.read(0) };
+        unsafe { win.write(0, val) };
+        let readback: u32 = unsafe { win.read(0) };
+        assert_eq!(val, readback);
+    }
+}

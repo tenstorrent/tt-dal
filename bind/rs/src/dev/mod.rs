@@ -242,3 +242,41 @@ impl Drop for Session {
         let _ = unsafe { ffi::tt_dev_close(&raw mut self.0) };
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serial_test::serial;
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn scan_nonempty() {
+        let devs: Vec<_> = super::Device::scan().expect("device scan failed").collect();
+        assert!(!devs.is_empty(), "expected at least one device");
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn open_smoke() {
+        crate::tests::open();
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn session_dev_roundtrip() {
+        let dev = crate::tests::open().dev();
+        // Device IDs are contiguous small integers
+        assert!(dev.id() < u32::MAX);
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn info_smoke() {
+        let info = crate::tests::open().info().expect("info failed");
+        // Tenstorrent PCI vendor ID is 0x1e52
+        assert_eq!(info.vendor_id, 0x1e52);
+    }
+}

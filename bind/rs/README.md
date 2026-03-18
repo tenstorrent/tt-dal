@@ -32,3 +32,21 @@ Requires CMake 3.21+ and a stable Rust toolchain.
 ```bash
 cargo build
 ```
+
+## Testing
+
+```bash
+cargo test
+```
+
+> [!TIP]
+>
+> Hardware tests are marked `#[ignore]` and require the [tt-kmd] kernel driver
+> and a connected device. They must be run explicitly:
+>
+> ```bash
+> cargo test -- --ignored           # hardware only
+> cargo test -- --include-ignored   # run all tests
+> ```
+
+[tt-kmd]: https://github.com/tenstorrent/tt-kmd
