@@ -56,25 +56,24 @@ cmake -B build
 make -C build all
 ```
 
-The library will be built as `build/libttdal.a`.
+The library will be built as `build/libttdal.a`. Alternatively, use `make`
+from the repository root.
 
 See the public header for complete API documentation.
 
 ## Testing
 
 ```bash
-# Build tests
-make -C build tests
-# Run tests (excludes hardware)
-ctest --preset default
+make test
 ```
 
 Hardware tests are labeled `hardware` and require the [tt-kmd] kernel driver
-and a connected device:
+and a connected device. By default, `make test` excludes them. To control
+which tests run, pass `PRESET`:
 
 ```bash
-ctest --preset hardware   # hardware tests only
-ctest --preset all        # all tests
+make test PRESET=hardware   # hardware tests only
+make test PRESET=all        # all tests
 ```
 
 ## Organization
@@ -88,6 +87,7 @@ system. Rust bindings are available via the `ttdal` crate at
 ```
 ./
 ├── CMakeLists.txt   # build configuration
+├── Makefile         # build shortcuts
 ├── DESIGN.md        # design philosophy
 ├── README.md        # this document
 ├── ...
