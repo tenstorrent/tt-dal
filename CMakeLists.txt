@@ -42,6 +42,12 @@ install(TARGETS ttdal
 
 install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
+# Tests
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    enable_testing()
+    add_subdirectory(tests EXCLUDE_FROM_ALL)
+endif()
+
 # Examples
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     add_subdirectory(examples EXCLUDE_FROM_ALL)
