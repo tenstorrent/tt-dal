@@ -1,0 +1,32 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "default",
+      "binaryDir": "${sourceDir}/build"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "all",
+      "description": "All tests including hardware",
+      "configurePreset": "default"
+    },
+    {
+      "name": "default",
+      "description": "All tests excluding hardware",
+      "configurePreset": "default",
+      "filter": {
+        "exclude": { "label": "hardware" }
+      }
+    },
+    {
+      "name": "hardware",
+      "description": "Hardware tests only",
+      "configurePreset": "default",
+      "filter": {
+        "include": { "label": "hardware" }
+      }
+    }
+  ]
+}

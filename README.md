@@ -60,6 +60,23 @@ The library will be built as `build/libttdal.a`.
 
 See the public header for complete API documentation.
 
+## Testing
+
+```bash
+# Build tests
+make -C build tests
+# Run tests (excludes hardware)
+ctest --preset default
+```
+
+Hardware tests are labeled `hardware` and require the [tt-kmd] kernel driver
+and a connected device:
+
+```bash
+ctest --preset hardware   # hardware tests only
+ctest --preset all        # all tests
+```
+
 ## Organization
 
 The repository is organized as a pure C library. CMake is used as the build
@@ -77,8 +94,9 @@ system. Rust bindings are available via the `ttdal` crate at
 ├── bind/            # language bindings
 │   └── rs/          # rust crate
 ├── include/         # public interface
-└── src/             # core implementation
-    └── lib.c        # main library
+├── src/             # core implementation
+│   └── lib.c        # main library
+└── tests/           # integration tests
 ```
 
 ## License
