@@ -11,6 +11,7 @@ foreach(dir ${DIRS})
         target_link_libraries(examples.${dir} PRIVATE ttdal)
         set_target_properties(examples.${dir} PROPERTIES OUTPUT_NAME ${dir})
         list(APPEND TARGETS examples.${dir})
+        set_property(GLOBAL APPEND PROPERTY FORMATTED ${src})
     endif()
 endforeach()
 
