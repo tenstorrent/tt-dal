@@ -95,7 +95,6 @@ system. Rust bindings are available via the `ttdal` crate at
 │   └── rs/          # rust crate
 ├── include/         # public interface
 ├── src/             # core implementation
-│   └── lib.c        # main library
 └── tests/           # integration tests
 ```
 
