@@ -2,6 +2,8 @@
 
 file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.c")
 
+set_property(GLOBAL APPEND PROPERTY FORMATTED ${CMAKE_CURRENT_SOURCE_DIR}/common.h)
+
 set(TARGETS)
 foreach(src ${SOURCES})
     string(REPLACE ".c" "" name "${src}")
@@ -11,6 +13,7 @@ foreach(src ${SOURCES})
     target_link_libraries(${target} PRIVATE ttdal)
     add_test(NAME ${name} COMMAND ${target})
     list(APPEND TARGETS ${target})
+    set_property(GLOBAL APPEND PROPERTY FORMATTED ${CMAKE_CURRENT_SOURCE_DIR}/${src})
 endforeach()
 
 # Labels

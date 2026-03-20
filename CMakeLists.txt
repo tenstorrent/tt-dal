@@ -15,6 +15,7 @@ include(GNUInstallDirs)
 
 file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS include/*.h)
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.c)
+set_property(GLOBAL APPEND PROPERTY FORMATTED ${SOURCES} ${HEADERS})
 
 # Library
 add_library(ttdal ${SOURCES})
@@ -51,6 +52,17 @@ endif()
 # Examples
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     add_subdirectory(examples EXCLUDE_FROM_ALL)
+endif()
+
+# Format
+find_program(CLANG_FORMAT clang-format)
+if(CLANG_FORMAT)
+    get_property(FORMATTED GLOBAL PROPERTY FORMATTED)
+    add_custom_target(fmt
+        COMMAND ${CLANG_FORMAT} -i ${FORMATTED}
+        COMMENT "Formatting source files"
+        VERBATIM
+    )
 endif()
 
 # Docs
