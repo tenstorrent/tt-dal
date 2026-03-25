@@ -14,10 +14,10 @@ int main(void) {
     tt_tlb_t tlb;
     assert(tt_tlb_alloc(dev, TT_TLB_2MB, TT_TLB_WC, &tlb) == 0);
     tt_tlb_config_t cfg = { .addr = 0, .x_end = 1, .y_end = 1 };
-    assert(tt_tlb_configure(dev, &tlb, &cfg) == 0);
+    assert(tt_tlb_bind(dev, &tlb, &cfg) == 0);
     void *old_ptr = tlb.ptr;
     // Reconfiguring must remap to a new address, invalidating stale pointers
-    assert(tt_tlb_configure(dev, &tlb, &cfg) == 0);
+    assert(tt_tlb_bind(dev, &tlb, &cfg) == 0);
     assert(tlb.ptr != NULL);
     assert(tlb.ptr != old_ptr);
 
