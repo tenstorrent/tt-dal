@@ -13,9 +13,9 @@ int main(void) {
 
     tt_tlb_t tlb;
     assert(tt_tlb_alloc(dev, TT_TLB_2MB, TT_TLB_WC, &tlb) == 0);
-    // Configure maps the window into process address space
+    // Bind maps the window into process address space
     tt_tlb_config_t cfg = { .addr = 0, .x_end = 1, .y_end = 1 };
-    assert(tt_tlb_configure(dev, &tlb, &cfg) == 0);
+    assert(tt_tlb_bind(dev, &tlb, &cfg) == 0);
     assert(tlb.ptr != NULL);
     assert(tlb.len > 0);
 

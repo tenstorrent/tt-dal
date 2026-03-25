@@ -87,7 +87,7 @@ metadata. For example, TLBs:
 ```c
 typedef struct tt_tlb {
     uint32_t id;           // TLB identifier
-    void *ptr;             // allocation pointer (NULL until configured)
+    void *ptr;             // allocation pointer (NULL until bound)
     size_t len;            // TLB window size
     uint64_t idx;          // memory-map offset (internal)
 } tt_tlb_t;
@@ -188,11 +188,22 @@ on a unopened device.
 
 #### TLB Lifecycle Safety
 
-**TL;DR**: Deferred mmap prevents accessing unconfigured memory. Fail-fast with
+**TL;DR**: Deferred mmap prevents accessing unbound memory. Fail-fast with
 `SIGSEGV`.
 
-TLB windows follow a strict **allocate → configure → free** lifecycle to prevent
-undefined behavior.
+TLB windows follow a strict **allocate → bind → free** lifecycle:
+
+- `alloc`: Claims a kernel-allocated TLB.
+- `bind`: Configures and maps the window to a NOC address.
+- `free`: Unmaps and releases the allocated TLB.
+
+> [!NOTE]
+>
+> The operation is named `tt_tlb_bind` rather than `tt_tlb_configure` because
+> it *associates* (binds) a window to a specific device address, analogous to
+> binding a socket to a network address. "Configure" implies adjusting internal
+> settings; "bind" captures the association between the window and its target
+> address, which is the essential operation here.
 
 ##### Memory Mapping
 
@@ -201,28 +212,27 @@ undefined NOC address space until configuration. Users could accidentally
 read or write through the pointer, causing silent data corruption or undefined
 hardware behavior.
 
-**Solution**: Defer `mmap` until `tt_tlb_configure`.
+**Solution**: Defer `mmap` until `tt_tlb_bind`.
 
 1. `tt_tlb_alloc()`: Allocates the TLB ID in the kernel, sets `ptr = NULL`.
-2. `tt_tlb_configure()`: Maps the window, sets `ptr`, configures the NOC
-   mapping.
-3. User accesses `tlb.ptr`: Valid pointer to configured device memory.
+2. `tt_tlb_bind()`: Maps the window, sets `ptr`, configures the NOC mapping.
+3. User accesses `tlb.ptr`: Valid pointer to bound device memory.
 4. `tt_tlb_free()`: Unmaps and clears the pointer to prevent further use.
 
-If users attempt to use `ptr` before configuration, they get immediate `SIGSEGV`
+If users attempt to use `ptr` before binding, they get immediate `SIGSEGV`
 (fail-fast) rather than silent corruption.
 
-##### Reconfiguration
+##### Rebinding
 
-When reconfiguring an already-mapped TLB, the implementation mmaps a new address
+When rebinding an already-mapped TLB, the implementation mmaps a new address
 first, then unmaps the old one. This ensures the kernel cannot reuse the old
 virtual address, invalidating any stale interior pointers users may have saved.
 Those pointers will fault on use rather than silently accessing different device
 memory.
 
-**Tradeoff**: Reconfigure incurs unmap/remap overhead (~microseconds), but
+**Tradeoff**: Rebind incurs unmap/remap overhead (~microseconds), but
 prioritizes **safety over performance**. Users building TLB pools can amortize
-allocation cost; configuration is expected to be infrequent relative to actual
+allocation cost. Binding is expected to be infrequent relative to actual
 device access.
 
 #### Reset Infallibility

@@ -9,7 +9,7 @@
 /// Allocate a TLB window.
 ///
 /// Allocates TLB via `ioctl`. Does not `mmap` yet; `ptr == NULL` until
-/// `tt_tlb_configure()` is called.
+/// `tt_tlb_bind()` is called.
 int tt_tlb_alloc(
     const tt_device_t *dev,
     tt_tlb_size_t size,
@@ -66,11 +66,11 @@ failure:
     return TT_ERR;
 }
 
-/// Configure TLB mapping.
+/// Bind TLB to a NOC address.
 ///
-/// `mmap`s TLB on first call. On reconfigure, `munmap`s old and remaps new to
+/// `mmap`s TLB on first call. On rebind, `munmap`s old and remaps new to
 /// invalidate stale interior pointers.
-int tt_tlb_configure(
+int tt_tlb_bind(
     const tt_device_t *dev, tt_tlb_t *tlb, const tt_tlb_config_t *cfg
 ) {
     // Validate args

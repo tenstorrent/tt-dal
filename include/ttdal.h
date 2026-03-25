@@ -466,7 +466,7 @@ typedef enum tt_tlb_size {
 ///
 /// Contains TLB identifier, mapped pointer, and size. Allocated by
 /// `tt_tlb_alloc()` and freed by `tt_tlb_free()`. The `ptr` field is `NULL`
-/// until `tt_tlb_configure()` is called.
+/// until `tt_tlb_bind()` is called.
 typedef struct tt_tlb {
     /// TLB identifier.
     uint32_t id;
@@ -518,8 +518,7 @@ typedef struct tt_tlb_config {
 ///
 /// Allocates a TLB of the requested size from the device. The kernel validates
 /// size availability for the device architecture. The returned TLB will not yet
-/// have a pointer (`NULL`) and must be configured with `tt_tlb_configure()`
-/// before use.
+/// have a pointer (`NULL`) and must be bound with `tt_tlb_bind()` before use.
 ///
 /// On an invalid `mode`, the freshly allocated TLB is freed before the call
 /// returns `TT_EINVAL`.
@@ -536,29 +535,32 @@ int tt_tlb_alloc(
     tt_tlb_t *tlb
 );
 
-/// Configure a TLB address mapping.
+/// Bind a TLB to a NOC address.
 ///
-/// Sets the NOC target address and coordinates, mapping the TLB into the
-/// process address space and setting the pointer.
+/// Maps the TLB window into the process address space and points it at the
+/// given NOC target address and coordinates. "Bind" reflects that this
+/// operation associates (binds) the window to a specific device address,
+/// analogous to binding a socket to a network address.
 ///
-/// Calling with an already-mapped TLB to remap will invalidate stale interior
+/// Calling with an already-mapped TLB to rebind will invalidate stale interior
 /// pointers (fail-fast on misuse).
 ///
 /// On failure the window is left completely unconfigured (`ptr` is `NULL`),
-/// including the previous mapping on a failed remap.
+/// including the previous mapping on a failed rebind.
 ///
 /// @param dev   Device handle.
 /// @param tlb   TLB handle.
 /// @param cfg   NOC configuration.
 /// @return      0 on success, -1 on error (check `tt_errno`).
-int tt_tlb_configure(
+int tt_tlb_bind(
     const tt_device_t *dev, tt_tlb_t *tlb, const tt_tlb_config_t *cfg
 );
 
 /// Free a TLB window.
 ///
 /// Releases the TLB window and unmaps its memory region. An unconfigured
-/// window needs no unmap. On success the handle's `id` is cleared.
+/// window (never bound) needs no unmap. On success the handle's `id` is
+/// cleared.
 ///
 /// @param dev   Device handle.
 /// @param tlb   TLB handle.
