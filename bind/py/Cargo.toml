@@ -1,0 +1,18 @@
+[package]
+name = "ttdal-py"
+version = { workspace = true }
+edition = { workspace = true }
+description = { workspace = true }
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "ttdal"
+crate-type = ["cdylib"]
+test = false
+doc = false
+
+[dependencies]
+pyo3 = { version = "0.28.3", features = ["extension-module", "multiple-pymethods"] }
+ttdal-sys = { workspace = true }

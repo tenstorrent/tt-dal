@@ -79,10 +79,13 @@ make test PRESET=all        # all tests
 ## Organization
 
 The repository is organized as a pure C library. CMake is used as the build
-system. Rust bindings are available via the `ttdal` crate at
-[`bind/rs/`][bind:rs].
+system. Language bindings are available under `bind/`:
+
+- **[Rust][bind:rs]**: `ttdal` crate.
+- **[Python][bind:py]**: `ttdal` extension module.
 
 [bind:rs]: /bind/rs/README.md
+[bind:py]: /bind/py/README.md
 
 ```
 ./
@@ -94,6 +97,7 @@ system. Rust bindings are available via the `ttdal` crate at
 ├── README.md        # this document
 ├── ...
 ├── bind/            # language bindings
+│   ├── py/          # python wheel
 │   └── rs/          # rust crate
 ├── include/         # public interface
 ├── src/             # core implementation
