@@ -145,7 +145,7 @@ impl Window<'_, '_> {
     /// at that address must support a read of this width.
     #[must_use]
     pub unsafe fn read<T: Copy>(&self, offset: usize) -> T {
-        // SAFETY: caller guarantees `offset` is in-bounds and aligned for `T`.
+        // SAFETY: Caller guarantees `offset` is in-bounds and aligned for `T`.
         unsafe {
             let ptr = (self.tlb.raw.ptr as *const u8).add(offset).cast::<T>();
             ptr.read_volatile()
@@ -160,7 +160,7 @@ impl Window<'_, '_> {
     /// `offset` must be in-bounds and correctly aligned for `T`. The hardware
     /// at that address must support a write of this width.
     pub unsafe fn write<T: Copy>(&self, offset: usize, val: T) {
-        // SAFETY: caller guarantees `offset` is in-bounds and aligned for `T`.
+        // SAFETY: Caller guarantees `offset` is in-bounds and aligned for `T`.
         unsafe {
             let ptr = self.tlb.raw.ptr.cast::<u8>().add(offset).cast::<T>();
             ptr.write_volatile(val);
