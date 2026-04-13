@@ -6,17 +6,16 @@
   Rust bindings for the Tenstorrent Device Access Library
 </p>
 
-Safe, idiomatic Rust bindings over [tt-dal](../../README.md). The workspace is
+Safe, idiomatic Rust bindings over [tt-dal](../../README.md). The crate is
 split between `ttdal`, which exposes the safe public API, and `ttdal-sys`,
 which provides the raw FFI layer.
 
 ## Organization
 
-The workspace is structured as follows:
+The crate is structured as follows:
 
 ```
 ./
-├── Cargo.lock       # cargo lockfile
 ├── Cargo.toml       # cargo manifest
 ├── README.md        # this document
 ├── ...

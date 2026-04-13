@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = [
+    "bind/rs",
+    "bind/rs/crates/*",
+    "bind/rs/sys",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+description = "Tenstorrent Device Access Library"
+
+[workspace.dependencies]
+bindgen = "0.72.1"
+cc = "1.2.56"
+cmake = "0.1.57"
+ttdal-sys = { path = "bind/rs/sys", version = "0.1.0" }

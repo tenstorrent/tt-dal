@@ -87,6 +87,8 @@ system. Rust bindings are available via the `ttdal` crate at
 ```
 ./
 ├── CMakeLists.txt   # build configuration
+├── Cargo.lock       # cargo lockfile
+├── Cargo.toml       # cargo workspace
 ├── Makefile         # build shortcuts
 ├── DESIGN.md        # design philosophy
 ├── README.md        # this document
