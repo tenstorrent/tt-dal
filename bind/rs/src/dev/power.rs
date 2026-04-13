@@ -29,8 +29,8 @@
 //! # Ok::<(), ttdal::Error>(())
 //! ```
 
-use crate::ffi;
 use super::Session;
+use crate::ffi;
 use crate::{Result, err};
 
 /// Power feature flag.
