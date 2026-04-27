@@ -149,19 +149,6 @@ pub struct Tlb {
     pub(crate) freed: bool,
 }
 
-impl Tlb {
-    /// Frees the TLB window, guarded against double-free.
-    fn free_inner(&mut self, py: Python<'_>) {
-        if !self.freed {
-            self.freed = true;
-            let sess = self.sess.borrow(py);
-            // SAFETY: `raw` was allocated by tt_tlb_alloc. tt_tlb_free handles
-            // closed sessions.
-            let _ = unsafe { ffi::tt_tlb_free(Session::as_ptr(&sess), &mut self.raw) };
-        }
-    }
-}
-
 #[pymethods]
 impl Tlb {
     fn __enter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
@@ -175,15 +162,22 @@ impl Tlb {
         _exc_val: &Bound<'_, PyAny>,
         _exc_tb: &Bound<'_, PyAny>,
     ) -> bool {
-        self.free_inner(py);
+        let _ = self.free(py);
         false
     }
 
     /// Frees the TLB window explicitly.
     ///
     /// Idempotent, so freeing an already-freed TLB is a no-op.
-    pub fn free(&mut self, py: Python<'_>) {
-        self.free_inner(py);
+    pub fn free(&mut self, py: Python<'_>) -> PyResult<()> {
+        if !self.freed {
+            self.freed = true;
+            let sess = self.sess.borrow(py);
+            // SAFETY: `raw` was allocated by tt_tlb_alloc. tt_tlb_free handles
+            // closed sessions.
+            crate::err::check(unsafe { ffi::tt_tlb_free(Session::as_ptr(&sess), &mut self.raw) })?;
+        }
+        Ok(())
     }
 
     /// Maps the TLB to the given NOC address and coordinates, returning a
@@ -237,9 +231,7 @@ impl Tlb {
 
 impl Drop for Tlb {
     fn drop(&mut self) {
-        if !self.freed {
-            Python::try_attach(|py| self.free_inner(py));
-        }
+        let _ = Python::try_attach(|py| self.free(py));
     }
 }
 

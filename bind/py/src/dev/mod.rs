@@ -8,6 +8,7 @@ pub mod telem;
 pub mod tlb;
 
 use std::ffi::CString;
+use std::mem::MaybeUninit;
 
 use pyo3::prelude::*;
 
@@ -51,7 +52,7 @@ impl Device {
     #[staticmethod]
     pub fn from_path(path: &str) -> PyResult<Self> {
         let path = CString::new(path).map_err(|_| crate::err::Error::new_err("invalid path"))?;
-        let mut raw = std::mem::MaybeUninit::<ffi::tt_device_t>::uninit();
+        let mut raw = MaybeUninit::<ffi::tt_device_t>::uninit();
         // SAFETY: `path` is a valid null-terminated C string and raw is a valid
         // out-pointer for tt_device_t.
         crate::err::check(unsafe { ffi::tt_dev_from_path(path.as_ptr(), raw.as_mut_ptr()) })?;
@@ -64,7 +65,7 @@ impl Device {
     #[staticmethod]
     pub fn from_bdf(addr: &str) -> PyResult<Self> {
         let addr = CString::new(addr).map_err(|_| crate::err::Error::new_err("invalid address"))?;
-        let mut raw = std::mem::MaybeUninit::<ffi::tt_device_t>::uninit();
+        let mut raw = MaybeUninit::<ffi::tt_device_t>::uninit();
         // SAFETY: `addr` is a valid null-terminated C string and raw is a valid
         // out-pointer for tt_device_t.
         crate::err::check(unsafe { ffi::tt_dev_from_bdf(addr.as_ptr(), raw.as_mut_ptr()) })?;
@@ -126,18 +127,19 @@ impl Session {
         _exc_val: &Bound<'_, PyAny>,
         _exc_tb: &Bound<'_, PyAny>,
     ) -> bool {
-        self.close();
+        let _ = self.close();
         false
     }
 
     /// Closes the session explicitly.
     ///
     /// Idempotent, so closing an already-closed session is a no-op.
-    pub fn close(&mut self) {
+    pub fn close(&mut self) -> PyResult<()> {
         if !self.is_closed() {
             // SAFETY: `raw` is an open device. Closing exactly once is safe.
-            let _ = unsafe { ffi::tt_dev_close(&mut self.0) };
+            crate::err::check(unsafe { ffi::tt_dev_close(&mut self.0) })?;
         }
+        Ok(())
     }
 
     /// Returns the underlying device descriptor.
@@ -170,7 +172,7 @@ impl Session {
 
 impl Drop for Session {
     fn drop(&mut self) {
-        self.close();
+        let _ = self.close();
     }
 }
 
