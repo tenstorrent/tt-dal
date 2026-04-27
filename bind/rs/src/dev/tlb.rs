@@ -93,6 +93,15 @@ pub struct Tlb<'dev> {
     dev: &'dev Session,
 }
 
+impl Drop for Tlb<'_> {
+    fn drop(&mut self) {
+        // SAFETY: `ptr::read` copies `self`. `free` wraps it in
+        // `ManuallyDrop`, preventing a second drop. The original is not used
+        // after this point.
+        let _ = unsafe { std::ptr::read(self) }.free();
+    }
+}
+
 impl<'dev> Tlb<'dev> {
     /// Maps the TLB to the given NOC address and coordinates, returning a
     /// [`Window`] for memory access.
@@ -109,14 +118,19 @@ impl<'dev> Tlb<'dev> {
         err::check(unsafe { ffi::tt_tlb_bind(self.dev.as_ptr(), &raw mut self.raw, cfg) })?;
         Ok(Window { tlb: self })
     }
-}
 
-impl Drop for Tlb<'_> {
-    fn drop(&mut self) {
-        // SAFETY: `self.dev` is an open device and `self.raw` is a TLB allocated
-        // by `tt_tlb_alloc`. Freeing here is safe because `Drop` runs exactly
-        // once when the `Tlb` goes out of scope.
-        let _ = unsafe { ffi::tt_tlb_free(self.dev.as_ptr(), &raw mut self.raw) };
+    /// Frees the TLB allocation, returning any error from the driver.
+    ///
+    /// Prefer this over dropping when you need to observe free errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the kernel driver fails to free the TLB.
+    pub fn free(self) -> Result<()> {
+        let mut this = std::mem::ManuallyDrop::new(self);
+        // SAFETY: `ManuallyDrop` prevents `Drop` from running, so `tt_tlb_free`
+        // is called exactly once here.
+        err::check(unsafe { ffi::tt_tlb_free(this.dev.as_ptr(), &raw mut this.raw) })
     }
 }
 

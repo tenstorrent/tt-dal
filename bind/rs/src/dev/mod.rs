@@ -180,6 +180,15 @@ impl Device {
 #[derive(Debug)]
 pub struct Session(ffi::tt_device_t);
 
+impl Drop for Session {
+    fn drop(&mut self) {
+        // SAFETY: `ptr::read` copies `self`. `close` wraps it in
+        // `ManuallyDrop`, preventing a second drop. The original is not used
+        // after this point.
+        let _ = unsafe { std::ptr::read(self) }.close();
+    }
+}
+
 #[expect(dead_code)]
 impl Session {
     /// Returns a reference to the underlying device handle.
@@ -200,6 +209,22 @@ impl Session {
     /// Returns a mutable raw pointer to the underlying device handle.
     pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::tt_device_t {
         &raw mut self.0
+    }
+}
+
+impl Session {
+    /// Closes the session, returning any error from the driver.
+    ///
+    /// Prefer this over dropping when you need to observe close errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the kernel driver fails to close the device.
+    pub fn close(self) -> Result<()> {
+        let mut this = std::mem::ManuallyDrop::new(self);
+        // SAFETY: `ManuallyDrop` prevents `Drop` from running, so
+        // `tt_dev_close` is called exactly once here.
+        err::check(unsafe { ffi::tt_dev_close(&raw mut this.0) })
     }
 }
 
@@ -232,14 +257,6 @@ impl Session {
         // SAFETY: `self.0` is an open device and `info` is a valid out-pointer.
         err::check(unsafe { ffi::tt_dev_info(self.as_ptr(), &raw mut info) })?;
         Ok(info)
-    }
-}
-
-impl Drop for Session {
-    fn drop(&mut self) {
-        // SAFETY: `self.0` is an open device; closing it here is safe because
-        // `Drop` runs exactly once when the `Session` goes out of scope.
-        let _ = unsafe { ffi::tt_dev_close(&raw mut self.0) };
     }
 }
 
