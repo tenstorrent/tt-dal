@@ -164,14 +164,16 @@ pub struct Telemetry {
 
 #[pymethods]
 impl Telemetry {
+    /// Returns the value for `tag`, or `None` if the tag is out of range.
+    fn get(&self, tag: Tag) -> Option<u32> {
+        self.data.get(tag.as_raw() as usize).copied()
+    }
+
     /// Returns the value for `tag`.
     ///
     /// Raises `IndexError` if the tag is out of range.
     fn __getitem__(&self, tag: Tag) -> PyResult<u32> {
-        let idx = tag.as_raw() as usize;
-        self.data
-            .get(idx)
-            .copied()
+        self.get(tag)
             .ok_or_else(|| pyo3::exceptions::PyIndexError::new_err("telemetry tag out of range"))
     }
 
@@ -192,6 +194,8 @@ use super::Session;
 #[pymethods]
 impl Session {
     /// Reads a complete telemetry snapshot.
+    ///
+    /// Tags the firmware does not report read as zero.
     ///
     /// Returns an error if the kernel driver fails to read telemetry.
     pub fn telemetry(&self) -> PyResult<Telemetry> {

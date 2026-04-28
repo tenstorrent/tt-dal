@@ -104,7 +104,8 @@ uninitialized or freed handle should not be reused.
 #### Architecture-Specific Code
 
 Implementation for features that differ across architectures is handled with
-explicit dispatch at each site that needs it, keeping differences visible and
+explicit dispatch at each site that needs it (e.g. telemetry selects its
+per-architecture constants with a `switch`), keeping differences visible and
 localized.
 
 ### API Conventions
@@ -292,10 +293,11 @@ telemetry table in a single operation.
 **Rationale**:
 
 1. **Consistency**: Multiple reads of individual tags would produce mismatched
-   data as device state changes between calls. A snapshot ensures all telemetry
-   values represent the same moment in time.
-2. **Performance**: Reading the entire table once is faster than repeated
-   individual reads. Exposing per-tag reads would encourage inefficient usage
+   data as device state changes between calls. A snapshot represents a single
+   update cycle, verified against the firmware heartbeat and retried on a
+   mismatch.
+2. **Performance**: The whole table is read through one mapped window in a
+   single pass. Exposing per-tag reads would encourage inefficient usage
    patterns.
 
 Users who need only specific tags can read the full snapshot and ignore unused

@@ -1,34 +1,33 @@
 //! Chip telemetry.
 //!
 //! Provides a snapshot of runtime sensor and status values reported
-//! by the device firmware. Values are returned as a flat array of
-//! `u32`s indexed by [`Tag`] variants, each corresponding to a
-//! specific measurement such as temperature, clock frequency, or
-//! power consumption.
+//! by the device firmware. Values are a flat array of `u32`s indexed
+//! by [`Tag`] variants, each corresponding to a specific measurement
+//! such as temperature, clock frequency, or power consumption.
 //!
 //! # Usage
 //!
 //! Read a telemetry snapshot with [`Session::telemetry()`] and index
-//! into it using a [`Tag`] variant cast to `usize`.
+//! into it using a [`Tag`] variant.
 //!
 //! ```no_run
 //! # use ttdal::dev::{Device, telem::Tag};
 //! #
 //! # let dev = Device::scan().unwrap().next().unwrap();
 //! #
-//! // Open a device session
-//! let con = dev.open()?;
+//! let sess = dev.open()?;
+//! let telem = sess.telemetry()?;
 //!
-//! // Read telemetry and inspect a value
-//! let telem = con.telemetry()?;
-//! let temp = telem[Tag::AsicTemperature as usize];
-//! println!("ASIC temperature: {temp}");
+//! let temp = telem[Tag::AsicTemperature];
+//! let aiclk = telem.get(Tag::AiClk);
 //! #
 //! # Ok::<(), ttdal::Error>(())
 //! ```
 
-use super::Session;
 use crate::ffi;
+use std::ops::Index;
+
+use super::Session;
 use crate::{Result, err};
 
 /// Telemetry tag.
@@ -104,17 +103,39 @@ pub enum Tag {
     EnabledMaxArb = ffi::TT_TAG_ENABLED_MAX_ARB,
 }
 
+/// A snapshot of device telemetry values, indexed by [`Tag`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct Telemetry([u32; ffi::TT_TELEMETRY_LEN as usize]);
+
+impl Telemetry {
+    /// Returns the value for `tag`, or `None` if the tag is out of range.
+    #[must_use]
+    pub fn get(&self, tag: Tag) -> Option<u32> {
+        self.0.get(tag as usize).copied()
+    }
+}
+
+impl Index<Tag> for Telemetry {
+    type Output = u32;
+
+    fn index(&self, tag: Tag) -> &u32 {
+        &self.0[tag as usize]
+    }
+}
+
 impl Session {
     /// Reads a complete telemetry snapshot.
+    ///
+    /// Tags the firmware does not report read as zero.
     ///
     /// # Errors
     ///
     /// Returns an error if the kernel driver fails to read telemetry.
-    pub fn telemetry(&self) -> Result<[u32; ffi::TT_TELEMETRY_LEN as usize]> {
+    pub fn telemetry(&self) -> Result<Telemetry> {
         let mut table = [0u32; ffi::TT_TELEMETRY_LEN as usize];
         // SAFETY: `self.0` is an open device and `table` is valid for
         // `TT_TELEMETRY_LEN` u32 writes.
         err::check(unsafe { ffi::tt_telemetry(self.as_ptr(), table.as_mut_ptr()) })?;
-        Ok(table)
+        Ok(Telemetry(table))
     }
 }

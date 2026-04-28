@@ -603,6 +603,8 @@ int tt_message(
 
 /// Telemetry tags.
 typedef enum tt_telemetry_tag {
+    /// Invalid/reserved tag (index 0 is unused).
+    TT_TAG_INVALID              = 0,
     /// High part of the board ID.
     TT_TAG_BOARD_ID_HIGH        = 1,
     /// Low part of the board ID.
@@ -767,7 +769,10 @@ typedef uint32_t tt_telemetry_t[TT_TELEMETRY_LEN];
 
 /// Read telemetry from device.
 ///
-/// Returns a complete snapshot without racing (not partial).
+/// Returns a complete, coherent snapshot rather than a partial read. The
+/// table is zeroed before filling, and tags the firmware does not report
+/// read as zero. Values are verified against the firmware heartbeat, with
+/// up to three retries on a mismatch.
 ///
 /// @param dev          Device handle.
 /// @param[out] table   Telemetry data output.
