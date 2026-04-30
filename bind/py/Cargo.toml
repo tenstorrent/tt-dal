@@ -14,5 +14,5 @@ test = false
 doc = false
 
 [dependencies]
-pyo3 = { version = "0.28.3", features = ["extension-module", "multiple-pymethods"] }
+pyo3 = { version = "0.28.3", features = ["abi3-py310", "extension-module", "multiple-pymethods"] }
 ttdal-sys = { workspace = true }
