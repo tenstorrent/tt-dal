@@ -93,6 +93,7 @@ system. Language bindings are available under `bind/`:
 ├── Cargo.lock       # cargo lockfile
 ├── Cargo.toml       # cargo workspace
 ├── Makefile         # build shortcuts
+├── pyproject.toml   # uv workspace
 ├── DESIGN.md        # design philosophy
 ├── README.md        # this document
 ├── ...
