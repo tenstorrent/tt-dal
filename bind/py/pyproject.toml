@@ -10,3 +10,4 @@ dynamic = ["version", "description", "license"]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+sdist-generator = "git"
