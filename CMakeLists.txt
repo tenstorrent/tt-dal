@@ -46,12 +46,16 @@ install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 # Tests
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     enable_testing()
-    add_subdirectory(tests EXCLUDE_FROM_ALL)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+        add_subdirectory(tests EXCLUDE_FROM_ALL)
+    endif()
 endif()
 
 # Examples
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    add_subdirectory(examples EXCLUDE_FROM_ALL)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples")
+        add_subdirectory(examples EXCLUDE_FROM_ALL)
+    endif()
 endif()
 
 # Format
