@@ -17,14 +17,14 @@ typedef struct {
     tt_dev_info_t info;
 } entry_t;
 
-// Close a device, reporting any failure
-static void close_or_warn(const char *prog, tt_device_t *dev) {
-    if (tt_dev_close(dev) < 0)
+// Close a session, reporting any failure
+static void close_or_warn(const char *prog, tt_session_t *sess) {
+    if (tt_close(sess) < 0)
         fprintf(
             stderr,
             "%s: error: device %u: close failed: %s\n",
             prog,
-            dev->id,
+            sess->dev.id,
             tt_error_describe(tt_errno)
         );
 }
@@ -193,9 +193,10 @@ int main(int argc, char *argv[]) {
     size_t nentries = 0;
     for (size_t i = 0; i < actual; i++) {
         entry_t *e = &entries[nentries];
-        e->dev     = (tt_device_t){ .id = devs[i].id, .fd = -1 };
+        e->dev     = (tt_device_t){ .id = devs[i].id };
 
-        if (tt_dev_open(&e->dev) < 0) {
+        tt_session_t sess;
+        if (tt_open(&e->dev, &sess) < 0) {
             fprintf(
                 stderr,
                 "%s: error: device %u: failed to open: %s\n",
@@ -208,7 +209,7 @@ int main(int argc, char *argv[]) {
 
         e->info = (tt_dev_info_t){ .output_size_bytes = sizeof(e->info) };
 
-        if (tt_dev_info(&e->dev, &e->info) < 0) {
+        if (tt_dev_info(&sess, &e->info) < 0) {
             fprintf(
                 stderr,
                 "%s: error: device %u: failed to get info: %s\n",
@@ -216,11 +217,11 @@ int main(int argc, char *argv[]) {
                 e->dev.id,
                 tt_error_describe(tt_errno)
             );
-            close_or_warn(prog, &e->dev);
+            close_or_warn(prog, &sess);
             continue;
         }
 
-        close_or_warn(prog, &e->dev);
+        close_or_warn(prog, &sess);
         nentries++;
     }
 

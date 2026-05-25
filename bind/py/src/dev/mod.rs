@@ -40,11 +40,11 @@ pub fn scan() -> PyResult<Vec<Device>> {
 
 /// Device descriptor.
 ///
-/// A lightweight, copyable descriptor that identifies a device. Holds no open
-/// resources. Call `open()` to obtain a `Session` that owns a handle to the
-/// device for performing operations.
+/// A lightweight, copyable struct describing a device. Holds no open resources.
+/// Call `open()` to obtain a `Session` handle for performing operations on
+/// the device.
 #[pyclass]
-pub struct Device(ffi::tt_device_t);
+pub struct Device(pub(crate) ffi::tt_device_t);
 
 #[pymethods]
 impl Device {
@@ -83,10 +83,12 @@ impl Device {
     ///
     /// Returns an error if the kernel driver fails to open the device.
     pub fn open(&self) -> PyResult<Session> {
-        let mut raw = self.0;
-        // SAFETY: `raw` is a valid device handle. tt_dev_open fills in the fd.
-        crate::err::check(unsafe { ffi::tt_dev_open(&mut raw) })?;
-        Ok(Session(raw))
+        let mut raw = MaybeUninit::<ffi::tt_session_t>::uninit();
+        // SAFETY: `self.0` is a valid device descriptor and raw is a valid
+        // out-pointer for tt_session_t.
+        crate::err::check(unsafe { ffi::tt_open(&self.0, raw.as_mut_ptr()) })?;
+        // SAFETY: `raw` was fully initialized by the successful call above.
+        Ok(Session(unsafe { raw.assume_init() }))
     }
 
     fn __repr__(&self) -> String {
@@ -94,14 +96,14 @@ impl Device {
     }
 }
 
-/// Open device session.
+/// Open session handle.
 ///
-/// An owned session for providing access to a device. Holds an open handle for
-/// the duration of the session. Call `Device.open()` to obtain a `Session`
-/// that is closed automatically when dropped. Usable as a context manager,
-/// closing the session on block exit.
+/// An owned handle for performing operations on a device. Holds an open file
+/// descriptor for the duration of the session. Call `Device.open()` to
+/// obtain a `Session` that is closed automatically when dropped. Usable as a
+/// context manager, closing the session on block exit.
 #[pyclass]
-pub struct Session(ffi::tt_device_t);
+pub struct Session(pub(crate) ffi::tt_session_t);
 
 impl Session {
     /// Returns whether the session has been closed.
@@ -109,8 +111,8 @@ impl Session {
         self.0.fd < 0
     }
 
-    /// Returns a const raw pointer to the underlying device handle.
-    pub(crate) fn as_ptr(&self) -> *const ffi::tt_device_t {
+    /// Returns a const raw pointer to the underlying session handle.
+    pub(crate) fn as_ptr(&self) -> *const ffi::tt_session_t {
         &self.0
     }
 }
@@ -136,17 +138,15 @@ impl Session {
     /// Idempotent, so closing an already-closed session is a no-op.
     pub fn close(&mut self) -> PyResult<()> {
         if !self.is_closed() {
-            // SAFETY: `raw` is an open device. Closing exactly once is safe.
-            crate::err::check(unsafe { ffi::tt_dev_close(&mut self.0) })?;
+            // SAFETY: `self.0` is an open session. Closing exactly once is safe.
+            crate::err::check(unsafe { ffi::tt_close(&mut self.0) })?;
         }
         Ok(())
     }
 
     /// Returns the underlying device descriptor.
     pub fn dev(&self) -> Device {
-        let mut raw = self.0;
-        raw.fd = -1;
-        Device(raw)
+        Device(self.0.dev)
     }
 
     /// Returns static information about the device.
@@ -156,7 +156,7 @@ impl Session {
         // SAFETY: Zeroing tt_dev_info_t is valid. All fields are plain integers.
         let mut info: ffi::tt_dev_info_t = unsafe { std::mem::zeroed() };
         info.output_size_bytes = std::mem::size_of::<ffi::tt_dev_info_t>() as u32;
-        // SAFETY: Self is an open device and info is a valid out-pointer.
+        // SAFETY: Self is an open session and info is a valid out-pointer.
         crate::err::check(unsafe { ffi::tt_dev_info(Session::as_ptr(self), &mut info) })?;
         Ok(Info(info))
     }
@@ -165,7 +165,7 @@ impl Session {
         if self.is_closed() {
             "Session(closed)".to_string()
         } else {
-            format!("Session(id={})", self.0.id)
+            format!("Session(id={})", self.0.dev.id)
         }
     }
 }

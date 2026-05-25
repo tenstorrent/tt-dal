@@ -18,9 +18,9 @@
 
 /// Create device from a path.
 ///
-/// Parses device number from path and initializes device handle. The path must
-/// be a device node under `/dev/tenstorrent/` (e.g., `/dev/tenstorrent/0` or
-/// `/dev/tenstorrent/by-id/<board-id>`).
+/// Parses device number from path and initializes device descriptor. The path
+/// must be a device node under `/dev/tenstorrent/` (e.g., `/dev/tenstorrent/0`
+/// or `/dev/tenstorrent/by-id/<board-id>`).
 int tt_dev_from_path(const char *path, tt_device_t *dev) {
     // Validate args
     if (!path || !dev)
@@ -47,18 +47,15 @@ int tt_dev_from_path(const char *path, tt_device_t *dev) {
     if (*endptr != '\0' || num > UINT32_MAX)
         return tt_errno = TT_EINVAL, TT_ERR;
 
-    // Initialize handle
-    *dev = (tt_device_t){
-        .id = (uint32_t)num,
-        .fd = -1,
-    };
+    // Initialize descriptor
+    *dev = (tt_device_t){ .id = (uint32_t)num };
 
     return TT_OK;
 }
 
 /// Create device from a PCIe BDF address.
 ///
-/// Scans connected devices and initializes the handle for the device
+/// Scans connected devices and initializes the descriptor for the device
 /// matching the given bus/device/function (BDF). Accepts DDDD:BB:DD.F or
 /// BB:DD.F format.
 int tt_dev_from_bdf(const char *addr, tt_device_t *dev) {
@@ -100,11 +97,12 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev) {
     tt_device_t devs[64];
     ssize_t count = tt_dev_scan(sizeof(devs) / sizeof(devs[0]), devs);
     for (ssize_t i = 0; i < count; i++) {
-        if (tt_dev_open(&devs[i]) < 0)
+        tt_session_t sess;
+        if (tt_open(&devs[i], &sess) < 0)
             continue;
         tt_dev_info_t info;
-        int res = tt_dev_info(&devs[i], &info);
-        tt_dev_close(&devs[i]);
+        int res = tt_dev_info(&sess, &info);
+        tt_close(&sess);
         if (res < 0)
             continue;
 
@@ -119,7 +117,7 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev) {
             info.bus_dev_fn & 0x7
         );
         if (strcmp(candidate, normalized) == 0) {
-            *dev = (tt_device_t){ .id = devs[i].id, .fd = -1 };
+            *dev = (tt_device_t){ .id = devs[i].id };
             return TT_OK;
         }
     }
@@ -152,7 +150,7 @@ ssize_t tt_dev_scan(size_t cap, tt_device_t buf[static cap]) {
 
         // Record entry
         if (count < cap)
-            buf[count] = (tt_device_t){ .id = num, .fd = -1 };
+            buf[count] = (tt_device_t){ .id = num };
         count++;
     }
 
@@ -161,24 +159,20 @@ ssize_t tt_dev_scan(size_t cap, tt_device_t buf[static cap]) {
     return (ssize_t)count;
 }
 
-/// Open device file descriptor.
+/// Open a session for a device.
 ///
-/// Opens `fd` if not already open. NOP if `fd >= 0`.
+/// Opens `/dev/tenstorrent/<id>` and initializes the session.
 ///
-/// Uses `O_APPEND` to signal power-aware client to kernel driver.
-int tt_dev_open(tt_device_t *dev) {
+/// Uses `O_APPEND` to signal a power-aware client to the kernel driver.
+int tt_open(const tt_device_t *dev, tt_session_t *sess) {
     // Validate args
-    if (!dev)
+    if (!dev || !sess)
         return tt_errno = TT_EINVAL, TT_ERR;
-
-    // Already open
-    if (dev->fd >= 0)
-        return TT_OK;
 
     // Build path
     char path[PATH_MAX];
-    size_t len = snprintf(path, sizeof(path), "/dev/tenstorrent/%u", dev->id);
-    if (len < 0 || len >= sizeof(path))
+    int len = snprintf(path, sizeof(path), "/dev/tenstorrent/%u", dev->id);
+    if (len < 0 || (size_t)len >= sizeof(path))
         return tt_errno = TT_ENOBUFS, TT_ERR; // BUG: internal error
 
     // Open device.
@@ -186,34 +180,37 @@ int tt_dev_open(tt_device_t *dev) {
     // `O_APPEND` signals to the kernel driver that this is a power-aware
     // client. The driver initializes power to all-off for this `fd` and
     // aggregates state across all open power-aware clients.
-    dev->fd = open(path, O_RDWR | O_CLOEXEC | O_APPEND);
-    if (dev->fd < 0)
+    int fd = open(path, O_RDWR | O_CLOEXEC | O_APPEND);
+    if (fd < 0)
         return tt_errno = TT_ENODEV, TT_ERR;
+
+    // Initialize session
+    *sess = (tt_session_t){ .dev = *dev, .fd = fd };
 
     return TT_OK;
 }
 
-/// Close device file descriptor.
+/// Close a session.
 ///
 /// Closes `fd` if open. NOP if `fd < 0`. Sets `fd` to `-1` on success.
-int tt_dev_close(tt_device_t *dev) {
+int tt_close(tt_session_t *sess) {
     // Validate args
-    if (!dev)
+    if (!sess)
         return tt_errno = TT_EINVAL, TT_ERR;
 
     // Already closed
-    if (dev->fd < 0)
+    if (sess->fd < 0)
         return TT_OK;
 
     // Close `fd`
-    if (close(dev->fd) != 0)
+    if (close(sess->fd) != 0)
         return tt_errno = TT_EIO, TT_ERR;
 
     // Sentinel `fd`.
     //
     // Guards against double-close and use-after-close without requiring
     // callers to track open state separately.
-    dev->fd = -1;
+    sess->fd = -1;
 
     return TT_OK;
 }
@@ -221,20 +218,20 @@ int tt_dev_close(tt_device_t *dev) {
 /// Get information about a device.
 ///
 /// Queries device info via `ioctl`. Copies output struct directly.
-int tt_dev_info(const tt_device_t *dev, tt_dev_info_t *info) {
+int tt_dev_info(const tt_session_t *sess, tt_dev_info_t *info) {
     // Validate args
-    if (!dev || !info)
+    if (!sess || !info)
         return tt_errno = TT_EINVAL, TT_ERR;
 
-    // Ensure device is open
-    if (dev->fd < 0)
+    // Ensure session is open
+    if (sess->fd < 0)
         return tt_errno = TT_ENOTOPEN, TT_ERR;
 
     // Query device info
     struct tenstorrent_get_device_info query = {
         .in.output_size_bytes = sizeof(query.out),
     };
-    if (ioctl(dev->fd, TENSTORRENT_IOCTL_GET_DEVICE_INFO, &query) != 0)
+    if (ioctl(sess->fd, TENSTORRENT_IOCTL_GET_DEVICE_INFO, &query) != 0)
         return tt_errno = TT_EIO, TT_ERR;
 
     // Unpack output

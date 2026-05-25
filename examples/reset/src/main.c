@@ -15,21 +15,21 @@
 //
 // Accepts a /dev/tenstorrent/N path or a PCIe bus/device/function (BDF)
 // string (DDDD:BB:DD.F or
-// BB:DD.F). Returns 0 with `dev->id` set and `dev->fd` = -1, or -1 on error.
+// BB:DD.F). Returns 0 with `dev->id` set, or -1 on error.
 static int device_from_spec(const char *spec, tt_device_t *dev) {
     if (strchr(spec, '/'))
         return tt_dev_from_path(spec, dev);
     return tt_dev_from_bdf(spec, dev);
 }
 
-// Close a device, reporting any failure
-static void close_or_warn(const char *prog, tt_device_t *dev) {
-    if (tt_dev_close(dev) < 0)
+// Close a session, reporting any failure
+static void close_or_warn(const char *prog, tt_session_t *sess) {
+    if (tt_close(sess) < 0)
         fprintf(
             stderr,
             "%s: error: device %u: close failed: %s\n",
             prog,
-            dev->id,
+            sess->dev.id,
             tt_error_describe(tt_errno)
         );
 }
@@ -111,8 +111,8 @@ int main(int argc, char *argv[]) {
         }
 
         // Verify device is accessible after reset
-        tt_device_t check = { .id = devs[i].id, .fd = -1 };
-        if (tt_dev_open(&check) < 0) {
+        tt_session_t sess;
+        if (tt_open(&devs[i], &sess) < 0) {
             fprintf(
                 stderr,
                 "%s: error: device %u: post-reset open failed: %s\n",
@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
         tt_dev_info_t info;
-        if (tt_dev_info(&check, &info) < 0) {
+        if (tt_dev_info(&sess, &info) < 0) {
             fprintf(
                 stderr,
                 "%s: error: device %u: post-reset verify failed: %s\n",
@@ -132,11 +132,11 @@ int main(int argc, char *argv[]) {
                 devs[i].id,
                 tt_error_describe(tt_errno)
             );
-            close_or_warn(prog, &check);
+            close_or_warn(prog, &sess);
             failed = 1;
             continue;
         }
-        close_or_warn(prog, &check);
+        close_or_warn(prog, &sess);
 
         printf("%s: device %u is online.\n", prog, devs[i].id);
     }

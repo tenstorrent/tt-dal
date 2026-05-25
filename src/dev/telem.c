@@ -31,18 +31,18 @@ static int
 snapshot(const volatile uint32_t *, const volatile uint32_t *, tt_telemetry_t);
 
 /// Get device telemetry.
-int tt_telemetry(const tt_device_t *dev, tt_telemetry_t table) {
+int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table) {
     // Validate args
-    if (!dev || !table)
+    if (!sess || !table)
         return tt_errno = TT_EINVAL, TT_ERR;
 
-    // Ensure device is open
-    if (dev->fd < 0)
+    // Ensure session is open
+    if (sess->fd < 0)
         return tt_errno = TT_ENOTOPEN, TT_ERR;
 
     // Fetch device info
     tt_dev_info_t info;
-    if (tt_dev_info(dev, &info) != 0)
+    if (tt_dev_info(sess, &info) != 0)
         return TT_ERR;
 
     // Select arch constants
@@ -70,7 +70,7 @@ int tt_telemetry(const tt_device_t *dev, tt_telemetry_t table) {
 
     // Allocate TLB
     tt_tlb_t tlb;
-    if (tt_tlb_alloc(dev, TT_TLB_2MB, TT_TLB_UC, &tlb) != 0)
+    if (tt_tlb_alloc(sess, TT_TLB_2MB, TT_TLB_UC, &tlb) != 0)
         return TT_ERR;
 
     // Bind TLB to APB
@@ -81,7 +81,7 @@ int tt_telemetry(const tt_device_t *dev, tt_telemetry_t table) {
         .y_end = noc_y,
         .noc   = 0,
     };
-    if (tt_tlb_bind(dev, &tlb, &cfg) != 0)
+    if (tt_tlb_bind(sess, &tlb, &cfg) != 0)
         goto cleanup;
 
     // Read CSM pointers
@@ -108,7 +108,7 @@ int tt_telemetry(const tt_device_t *dev, tt_telemetry_t table) {
         .y_end = noc_y,
         .noc   = 0,
     };
-    if (tt_tlb_bind(dev, &tlb, &cfg) != 0)
+    if (tt_tlb_bind(sess, &tlb, &cfg) != 0)
         goto cleanup;
 
     // Compute CSM pointers
@@ -121,11 +121,11 @@ int tt_telemetry(const tt_device_t *dev, tt_telemetry_t table) {
 
     // Read telemetry snapshot
     int ret = snapshot(tags, data, table);
-    tt_tlb_free(dev, &tlb);
+    tt_tlb_free(sess, &tlb);
     return ret;
 
 cleanup:
-    tt_tlb_free(dev, &tlb);
+    tt_tlb_free(sess, &tlb);
     return TT_ERR;
 }
 

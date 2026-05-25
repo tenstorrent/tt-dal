@@ -6,15 +6,15 @@
 
 // MARK: hardware
 int main(void) {
-    tt_device_t devs[1];
-    tt_device_t *dev = open_test_device(devs);
-    if (!dev)
+    tt_session_t s;
+    tt_session_t *sess = open_test_device(&s);
+    if (!sess)
         return EXIT_FAILURE;
 
     tt_telemetry_t table;
-    assert(tt_telemetry(dev, table) == 0);
+    assert(tt_telemetry(sess, table) == 0);
     assert(table[TT_TAG_TIMER_HEARTBEAT] != 0);
     assert(table[TT_TAG_AICLK] > 0);
 
-    tt_dev_close(dev);
+    tt_close(sess);
 }

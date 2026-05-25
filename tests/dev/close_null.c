@@ -5,6 +5,6 @@
 
 int main(void) {
     // NULL pointer must be rejected
-    assert(tt_dev_close(NULL) < 0);
+    assert(tt_close(NULL) < 0);
     assert(tt_errno == TT_EINVAL);
 }

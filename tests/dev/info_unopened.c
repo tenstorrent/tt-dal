@@ -4,9 +4,9 @@
 #include <ttdal.h>
 
 int main(void) {
-    // Unopened device (fd = -1) must be rejected
-    tt_device_t dev = { .id = 0, .fd = -1 };
+    // Unopened session (fd = -1) must be rejected
+    tt_session_t sess = { .dev = { .id = 0 }, .fd = -1 };
     tt_dev_info_t info;
-    assert(tt_dev_info(&dev, &info) < 0);
+    assert(tt_dev_info(&sess, &info) < 0);
     assert(tt_errno == TT_ENOTOPEN);
 }

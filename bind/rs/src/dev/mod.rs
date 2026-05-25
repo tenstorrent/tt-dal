@@ -24,9 +24,9 @@ pub type Id = u32;
 
 /// Device descriptor.
 ///
-/// A lightweight, copyable descriptor that identifies a device. Holds no open
-/// resources. Call [`open()`] to obtain a [`Session`] that owns a handle to the
-/// device for performing operations.
+/// A lightweight, copyable struct describing a device. Holds no open resources.
+/// Call [`open()`] to obtain a [`Session`] handle for performing operations on
+/// the device.
 ///
 /// [`open()`]: Self::open
 #[derive(Clone, Copy, Debug)]
@@ -34,22 +34,22 @@ pub struct Device(ffi::tt_device_t);
 
 #[expect(dead_code)]
 impl Device {
-    /// Returns a reference to the underlying device handle.
+    /// Returns a reference to the underlying device descriptor.
     pub(crate) fn as_raw(&self) -> &ffi::tt_device_t {
         &self.0
     }
 
-    /// Returns a mutable reference to the underlying device handle.
+    /// Returns a mutable reference to the underlying device descriptor.
     pub(crate) unsafe fn as_raw_mut(&mut self) -> &mut ffi::tt_device_t {
         &mut self.0
     }
 
-    /// Returns a const raw pointer to the underlying device handle.
+    /// Returns a const raw pointer to the underlying device descriptor.
     pub(crate) fn as_ptr(&self) -> *const ffi::tt_device_t {
         self.as_raw()
     }
 
-    /// Returns a mutable raw pointer to the underlying device handle.
+    /// Returns a mutable raw pointer to the underlying device descriptor.
     pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::tt_device_t {
         &raw mut self.0
     }
@@ -66,7 +66,7 @@ impl Eq for Device {}
 impl TryFrom<&Path> for Device {
     type Error = Error;
 
-    /// Constructs a device identifier from the given `/dev/tenstorrent/` path.
+    /// Constructs a device descriptor from the given `/dev/tenstorrent/` path.
     fn try_from(path: &Path) -> Result<Self> {
         let path = CString::new(path.as_os_str().as_bytes())
             .map_err(|_| Error::from_raw_error(ffi::TT_EINVAL))?;
@@ -84,7 +84,7 @@ impl TryFrom<&Path> for Device {
 impl TryFrom<pci::Address> for Device {
     type Error = Error;
 
-    /// Constructs a device identifier for the device at the given PCI address.
+    /// Constructs a device descriptor for the device at the given PCI address.
     fn try_from(addr: pci::Address) -> Result<Self> {
         let bdf =
             CString::new(addr.to_string()).map_err(|_| Error::from_raw_error(ffi::TT_EINVAL))?;
@@ -142,21 +142,22 @@ impl Device {
         // `tt_dev_scan` and does not exceed the allocated capacity.
         unsafe { buf.set_len(len) };
 
-        // Wrap each raw handle in the `Device` newtype
+        // Wrap each raw descriptor in the `Device` newtype
         Ok(buf.into_iter().map(Device))
     }
 
-    /// Opens the device and returns a [`Session`] that owns the handle.
+    /// Opens the device and returns a [`Session`] handle.
     ///
     /// # Errors
     ///
     /// Returns an error if the kernel driver fails to open the device.
     pub fn open(self) -> Result<Session> {
-        let mut raw = self.0;
-        // SAFETY: `raw` is a valid device handle; `tt_dev_open` fills in
-        // the file descriptor.
-        err::check(unsafe { ffi::tt_dev_open(&raw mut raw) })?;
-        Ok(Session(raw))
+        let mut raw = MaybeUninit::<ffi::tt_session_t>::uninit();
+        // SAFETY: `self.0` is a valid device descriptor and `raw` is a valid
+        // out-pointer for `tt_session_t`.
+        err::check(unsafe { ffi::tt_open(&raw const self.0, raw.as_mut_ptr()) })?;
+        // SAFETY: `raw` was fully initialized by the successful call above.
+        Ok(Session(unsafe { raw.assume_init() }))
     }
 }
 
@@ -172,13 +173,13 @@ impl Device {
     }
 }
 
-/// Open device session.
+/// Open session handle.
 ///
-/// An owned session for providing access to a device. Holds an open handle for
-/// the duration of the session. Call [`Device::open()`] to obtain a `Session`
-/// that is closed automatically when dropped.
+/// An owned handle for performing operations on a device. Holds an open file
+/// descriptor for the duration of the session. Call [`Device::open()`] to
+/// obtain a `Session` that is closed automatically when dropped.
 #[derive(Debug)]
-pub struct Session(ffi::tt_device_t);
+pub struct Session(ffi::tt_session_t);
 
 impl Drop for Session {
     fn drop(&mut self) {
@@ -191,23 +192,23 @@ impl Drop for Session {
 
 #[expect(dead_code)]
 impl Session {
-    /// Returns a reference to the underlying device handle.
-    pub(crate) fn as_raw(&self) -> &ffi::tt_device_t {
+    /// Returns a reference to the underlying session handle.
+    pub(crate) fn as_raw(&self) -> &ffi::tt_session_t {
         &self.0
     }
 
-    /// Returns a mutable reference to the underlying device handle.
-    pub(crate) unsafe fn as_raw_mut(&mut self) -> &mut ffi::tt_device_t {
+    /// Returns a mutable reference to the underlying session handle.
+    pub(crate) unsafe fn as_raw_mut(&mut self) -> &mut ffi::tt_session_t {
         &mut self.0
     }
 
-    /// Returns a const raw pointer to the underlying device handle.
-    pub(crate) fn as_ptr(&self) -> *const ffi::tt_device_t {
+    /// Returns a const raw pointer to the underlying session handle.
+    pub(crate) fn as_ptr(&self) -> *const ffi::tt_session_t {
         self.as_raw()
     }
 
-    /// Returns a mutable raw pointer to the underlying device handle.
-    pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::tt_device_t {
+    /// Returns a mutable raw pointer to the underlying session handle.
+    pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::tt_session_t {
         &raw mut self.0
     }
 }
@@ -223,8 +224,8 @@ impl Session {
     pub fn close(self) -> Result<()> {
         let mut this = std::mem::ManuallyDrop::new(self);
         // SAFETY: `ManuallyDrop` prevents `Drop` from running, so
-        // `tt_dev_close` is called exactly once here.
-        err::check(unsafe { ffi::tt_dev_close(&raw mut this.0) })
+        // `tt_close` is called exactly once here.
+        err::check(unsafe { ffi::tt_close(&raw mut this.0) })
     }
 }
 
@@ -233,12 +234,10 @@ impl Session {
 /// Read-only accessors for session properties that do not require device
 /// operations.
 impl Session {
-    /// Returns the underlying device identifier.
+    /// Returns the underlying device descriptor.
     #[must_use]
     pub fn dev(&self) -> Device {
-        let mut raw = self.0;
-        raw.fd = -1;
-        Device(raw)
+        Device(self.0.dev)
     }
 }
 
@@ -254,7 +253,7 @@ impl Session {
         let mut info: Info = unsafe { std::mem::zeroed() };
         info.output_size_bytes =
             u32::try_from(std::mem::size_of::<Info>()).expect("info size fits in u32");
-        // SAFETY: `self.0` is an open device and `info` is a valid out-pointer.
+        // SAFETY: `self.0` is an open session and `info` is a valid out-pointer.
         err::check(unsafe { ffi::tt_dev_info(self.as_ptr(), &raw mut info) })?;
         Ok(info)
     }

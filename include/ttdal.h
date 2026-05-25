@@ -25,6 +25,7 @@ extern "C" {
 #include <sys/types.h>
 
 typedef struct tt_device tt_device_t;
+typedef struct tt_session tt_session_t;
 
 /*============================================================================*
  * VERSION                                                                    *
@@ -80,10 +81,10 @@ int tt_version_driver(tt_version_t *version);
 /// Reads the firmware bundle version from a per-device sysfs attribute. A
 /// non-zero release candidate maps to an `rc.N` pre-release identifier.
 ///
-/// @param dev           Device handle (must be open).
+/// @param sess          Session handle.
 /// @param[out] version  Firmware version output.
 /// @return              0 on success, -1 on error (check `tt_errno`).
-int tt_version_firmware(const tt_device_t *dev, tt_version_t *version);
+int tt_version_firmware(const tt_session_t *sess, tt_version_t *version);
 
 /*============================================================================*
  * ERRORS                                                                     *
@@ -266,19 +267,18 @@ static inline const char *tt_arch_describe(tt_arch_t arch) {
     }
 }
 
-/// Device handle.
+/// Device descriptor.
 ///
-/// A handle that identifies a device and provides means for various supported
-/// operations.
+/// A small, copyable struct describing a device. Holds no open resources.
 ///
-/// These are obtained by calling `tt_dev_scan()`. In order to use the
-/// device, it must have been opened with `tt_dev_open()`. Use
-/// `tt_dev_close()` to clean up open devices.
+/// Obtain via `tt_dev_scan()`, `tt_dev_from_path()`, or
+/// `tt_dev_from_bdf()`. To perform operations on the device, open a session
+/// handle with `tt_open()`.
 typedef struct tt_device {
     /// Device identifier.
     ///
     /// Uniquely identifies a device. Suitable for comparisons, as multiple
-    /// instances of the same device will share this identifier,
+    /// descriptors for the same device will share this identifier.
     ///
     /// TODO: This value should remain stable after a reset, although the
     /// current implementation does not reflect this. This could be accomplished
@@ -287,22 +287,33 @@ typedef struct tt_device {
     /// NOTE: This choice of type is unstable, and may be changed without
     /// warning before the initial release.
     uint32_t id;
+} tt_device_t;
+
+/// Open session handle.
+///
+/// An owned handle that holds an open file descriptor to a device. Required to
+/// perform any operation that interacts with hardware.
+///
+/// Obtain via `tt_open()`; release via `tt_close()`. A handle is invalidated by
+/// `tt_reset()` on its underlying device.
+typedef struct tt_session {
+    /// Device descriptor for this session.
+    tt_device_t dev;
     /// File descriptor.
     ///
-    /// A handle to the underlying device owned by this device instance. It is
-    /// used to perform operations on the device. When not opened, the value is
-    /// `-1`.
+    /// Underlying kernel fd used for `ioctl` and `mmap`. `-1` after
+    /// `tt_close()` to detect use-after-close.
     int fd;
-} tt_device_t;
+} tt_session_t;
 
 /// Create device from a path.
 ///
 /// The path is resolved through symlinks, so `by-id/` entries work.
 ///
-/// Must call `tt_dev_open()` before using the device.
+/// Must call `tt_open()` to obtain a session before using the device.
 ///
 /// @param path      Device path.
-/// @param[out] dev  Device handle to initialize.
+/// @param[out] dev  Device descriptor to initialize.
 /// @return          0 on success, -1 on error (check `tt_errno`).
 ///
 /// @par Example
@@ -312,23 +323,24 @@ typedef struct tt_device {
 /// if (tt_dev_from_path("/dev/tenstorrent/0", &dev) < 0) {
 ///     // Handle error
 /// }
-/// tt_dev_open(&dev);
-/// // ... use device ...
-/// tt_dev_close(&dev);
+/// tt_session_t sess;
+/// tt_open(&dev, &sess);
+/// // ... use session ...
+/// tt_close(&sess);
 /// ```
 int tt_dev_from_path(const char *path, tt_device_t *dev);
 
 /// Create device from a PCIe bus/device/function (BDF) address.
 ///
-/// Scans connected devices and initializes the handle for the device
+/// Scans connected devices and initializes the descriptor for the device
 /// matching the given BDF. Accepts `DDDD:BB:DD.F` or
 /// `BB:DD.F` format. Each
 /// scanned device is briefly opened to read and compare its BDF.
 ///
-/// Must call `tt_dev_open()` before using the device.
+/// Must call `tt_open()` to obtain a session before using the device.
 ///
 /// @param addr      PCIe BDF string (e.g. "0000:03:00.0" or "03:00.0").
-/// @param[out] dev  Device handle to initialize.
+/// @param[out] dev  Device descriptor to initialize.
 /// @return          0 on success, -1 on error (check `tt_errno`).
 ///
 /// @par Example
@@ -338,18 +350,20 @@ int tt_dev_from_path(const char *path, tt_device_t *dev);
 /// if (tt_dev_from_bdf("0000:03:00.0", &dev) < 0) {
 ///     // Handle error
 /// }
-/// tt_dev_open(&dev);
-/// // ... use device ...
-/// tt_dev_close(&dev);
+/// tt_session_t sess;
+/// tt_open(&dev, &sess);
+/// // ... use session ...
+/// tt_close(&sess);
 /// ```
 int tt_dev_from_bdf(const char *addr, tt_device_t *dev);
 
 /// Discover connected devices.
 ///
-/// Scans for connected devices. Fills buffer with up to `cap` devices. Return
-/// value may exceed `cap` if more devices were found.
+/// Scans for connected devices. Fills buffer with up to `cap` descriptors.
+/// Return value may exceed `cap` if more devices were found.
 ///
-/// Must call `tt_dev_open()` before using a device obtained this way.
+/// Must call `tt_open()` to obtain a session before using a device obtained
+/// this way.
 ///
 /// @param cap       Capacity of output buffer.
 /// @param[out] buf  Buffer for found devices.
@@ -366,30 +380,33 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev);
 ///
 /// size_t actual = (count < 16) ? count : 16;
 /// for (size_t i = 0; i < actual; i++) {
-///     tt_dev_open(&devs[i]);
-///     // ... use device ...
-///     tt_dev_close(&devs[i]);
+///     tt_session_t sess;
+///     tt_open(&devs[i], &sess);
+///     // ... use session ...
+///     tt_close(&sess);
 /// }
 /// ```
 ssize_t tt_dev_scan(size_t cap, tt_device_t buf[static cap]);
 
-/// Open device.
+/// Open a session handle for a device.
 ///
-/// Opens the device, after which it can be used. Multiple calls are safe.
-/// Results in a NOP if already open.
+/// Opens the underlying device and initializes the session handle for use.
+/// The session struct is reusable: it may be reopened after `tt_close()`.
 ///
-/// @param dev   Device handle.
-/// @return      0 on success, -1 on error (check `tt_errno`).
-int tt_dev_open(tt_device_t *dev);
+/// @param dev       Device descriptor.
+/// @param[out] sess Session handle to initialize.
+/// @return          0 on success, -1 on error (check `tt_errno`).
+int tt_open(const tt_device_t *dev, tt_session_t *sess);
 
-/// Close device.
+/// Close a session handle.
 ///
-/// Closes the device, after which it can no longer be used. Multiple calls are
-/// safe. Results in a NOP if already closed.
+/// Releases the file descriptor and invalidates the handle. After this call,
+/// `sess->fd` is `-1`. Idempotent, so closing an already-closed session is a
+/// no-op.
 ///
-/// @param dev   Device handle.
+/// @param sess  Session handle.
 /// @return      0 on success, -1 on error (check `tt_errno`).
-int tt_dev_close(tt_device_t *dev);
+int tt_close(tt_session_t *sess);
 
 /// Device information.
 ///
@@ -418,10 +435,10 @@ typedef struct tt_dev_info {
 /// Gets static information about a device. Guaranteed not to change during the
 /// device lifecycle.
 ///
-/// @param dev       Device handle.
+/// @param sess      Session handle.
 /// @param[out] info Device information output.
 /// @return          0 on success, -1 on error (check `tt_errno`).
-int tt_dev_info(const tt_device_t *dev, tt_dev_info_t *info);
+int tt_dev_info(const tt_session_t *sess, tt_dev_info_t *info);
 
 /*============================================================================*
  * ADDRESSING                                                                 *
@@ -523,13 +540,13 @@ typedef struct tt_tlb_config {
 /// On an invalid `mode`, the freshly allocated TLB is freed before the call
 /// returns `TT_EINVAL`.
 ///
-/// @param dev      Device handle.
+/// @param sess     Session handle.
 /// @param size     Window size.
 /// @param mode     Cache mode.
 /// @param[out] tlb Allocated TLB handle with `ptr = NULL`.
 /// @return         0 on success, -1 on error (check `tt_errno`).
 int tt_tlb_alloc(
-    const tt_device_t *dev,
+    const tt_session_t *sess,
     tt_tlb_size_t size,
     tt_tlb_cache_mode_t mode,
     tt_tlb_t *tlb
@@ -548,12 +565,12 @@ int tt_tlb_alloc(
 /// On failure the window is left completely unconfigured (`ptr` is `NULL`),
 /// including the previous mapping on a failed rebind.
 ///
-/// @param dev   Device handle.
+/// @param sess  Session handle.
 /// @param tlb   TLB handle.
 /// @param cfg   NOC configuration.
 /// @return      0 on success, -1 on error (check `tt_errno`).
 int tt_tlb_bind(
-    const tt_device_t *dev, tt_tlb_t *tlb, const tt_tlb_config_t *cfg
+    const tt_session_t *sess, tt_tlb_t *tlb, const tt_tlb_config_t *cfg
 );
 
 /// Free a TLB window.
@@ -562,10 +579,10 @@ int tt_tlb_bind(
 /// window (never bound) needs no unmap. On success the handle's `id` is
 /// cleared.
 ///
-/// @param dev   Device handle.
+/// @param sess  Session handle.
 /// @param tlb   TLB handle.
 /// @return      0 on success, -1 on error (check `tt_errno`).
-int tt_tlb_free(const tt_device_t *dev, tt_tlb_t *tlb);
+int tt_tlb_free(const tt_session_t *sess, tt_tlb_t *tlb);
 
 /*============================================================================*
  * MESSAGING                                                                  *
@@ -586,13 +603,13 @@ typedef struct tt_message {
 /// @warning ARC messaging is unimplemented. Past its argument guards, this
 /// function aborts the process.
 ///
-/// @param dev            Device handle.
+/// @param sess           Session handle.
 /// @param[in,out] msg    ARC message body.
 /// @param wait           Wait for completion.
 /// @param timeout        Timeout in milliseconds (`0` for default 1000ms).
 /// @return               0 on success, -1 on error (check `tt_errno`).
 int tt_message(
-    const tt_device_t *dev, tt_message_t *msg, bool wait, uint32_t timeout
+    const tt_session_t *sess, tt_message_t *msg, bool wait, uint32_t timeout
 );
 
 /*============================================================================*
@@ -774,10 +791,10 @@ typedef uint32_t tt_telemetry_t[TT_TELEMETRY_LEN];
 /// read as zero. Values are verified against the firmware heartbeat, with
 /// up to three retries on a mismatch.
 ///
-/// @param dev          Device handle.
+/// @param sess         Session handle.
 /// @param[out] table   Telemetry data output.
 /// @return             0 on success, -1 on error (check `tt_errno`).
-int tt_telemetry(const tt_device_t *dev, tt_telemetry_t table);
+int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table);
 
 /*============================================================================*
  * POWER                                                                      *
@@ -792,7 +809,7 @@ int tt_telemetry(const tt_device_t *dev, tt_telemetry_t table);
 /// Individual power feature controls passed to `tt_power()`.
 /// Each flag is a single bit. Set it to enable the feature, clear to disable.
 ///
-/// @note Devices opened via `tt_dev_open()` start with all features off.
+/// @note Sessions opened via `tt_open()` start with all features off.
 /// Use `tt_power()` to request power features explicitly.
 typedef enum tt_power_flag {
     /// AI clock selection.
@@ -830,15 +847,15 @@ typedef enum tt_power_flag {
 ///
 /// ```c
 /// uint16_t flags = TT_POWER_MAX_AI_CLK | TT_POWER_TENSIX_ENABLE;
-/// if (tt_power(&dev, flags) < 0) {
+/// if (tt_power(&sess, flags) < 0) {
 ///     // Handle error
 /// }
 /// ```
 ///
-/// @param dev    Device handle.
+/// @param sess   Session handle.
 /// @param flags  Bitmask of `tt_power_flag_t` values to enable.
 /// @return       0 on success, -1 on error (check `tt_errno`).
-int tt_power(const tt_device_t *dev, uint16_t flags);
+int tt_power(const tt_session_t *sess, uint16_t flags);
 
 /*============================================================================*
  * RESET                                                                      *
@@ -848,12 +865,16 @@ int tt_power(const tt_device_t *dev, uint16_t flags);
 
 /// Trigger device reset.
 ///
-/// Initiates a reset sequence. Closes any open file descriptor in `dev` and
-/// opens a temporary `fd` for the operation so that reset works even if the
-/// existing `fd` is corrupted. After the ASIC reset, polls until the device
-/// reappears and issues the post-reset `ioctl`. All TLBs are invalidated.
+/// Initiates a reset sequence. Opens a temporary file descriptor internally so
+/// that reset works without needing a session. After the ASIC reset, polls
+/// until the device reappears and issues the post-reset `ioctl`. The device
+/// number may change after reset; `dev->id` is updated to reflect the new ID.
 ///
-/// @param dev   Device handle.
+/// All sessions and TLBs for this device are invalidated by reset; the caller
+/// is responsible for closing any open sessions beforehand and reopening
+/// fresh sessions afterward.
+///
+/// @param dev   Device descriptor.
 /// @return      0 on success, -1 on error (check `tt_errno`).
 int tt_reset(tt_device_t *dev);
 

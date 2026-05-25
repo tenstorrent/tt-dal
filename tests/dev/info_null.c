@@ -6,12 +6,12 @@
 
 // MARK: hardware
 int main(void) {
-    tt_device_t devs[1];
-    tt_device_t *dev = open_test_device(devs);
-    if (!dev)
+    tt_session_t s;
+    tt_session_t *sess = open_test_device(&s);
+    if (!sess)
         return EXIT_FAILURE;
-    // NULL info pointer must be rejected even on an open device
-    assert(tt_dev_info(dev, NULL) < 0);
+    // NULL info pointer must be rejected even on an open session
+    assert(tt_dev_info(sess, NULL) < 0);
     assert(tt_errno == TT_EINVAL);
-    tt_dev_close(dev);
+    tt_close(sess);
 }
