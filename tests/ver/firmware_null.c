@@ -5,7 +5,7 @@
 
 int main(void) {
     tt_version_t ver;
-    // NULL device pointer must be rejected
+    // NULL session pointer must be rejected
     assert(tt_version_firmware(NULL, &ver) < 0);
     assert(tt_errno == TT_EINVAL);
 }

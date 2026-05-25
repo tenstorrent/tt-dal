@@ -7,13 +7,13 @@
 
 // MARK: hardware
 int main(void) {
-    tt_device_t devs[1];
-    tt_device_t *dev = open_test_device(devs);
-    if (!dev)
+    tt_session_t s;
+    tt_session_t *sess = open_test_device(&s);
+    if (!sess)
         return EXIT_FAILURE;
     // Wake up the GDDR PHY
-    int rc = tt_power(dev, TT_POWER_MRISC_PHY_WAKEUP);
+    int rc = tt_power(sess, TT_POWER_MRISC_PHY_WAKEUP);
     if (rc < 0)
         printf("mrisc_phy_wakeup failed: tt_errno=%d\n", tt_errno);
-    tt_dev_close(dev);
+    tt_close(sess);
 }

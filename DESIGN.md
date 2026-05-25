@@ -50,21 +50,31 @@ What this library explicitly **does not** provide:
 
 #### Device Representation
 
-Devices are represented as transparent structs containing a device ID and file
-descriptor:
+Devices are modeled with two transparent structs: a cheap *descriptor* and an
+owned *session*.
 
 ```c
 typedef struct tt_device {
-    uint32_t id;   // Device number (0, 1, 2, ...)
-    int fd;        // File descriptor (-1 when closed)
+    uint32_t id;       // Device number (0, 1, 2, ...)
 } tt_device_t;
+
+typedef struct tt_session {
+    tt_device_t dev;   // Device descriptor
+    int fd;            // File descriptor (-1 after close)
+} tt_session_t;
 ```
+
+A `tt_device_t` is a copyable identifier with no associated resources. It is
+suitable for scanning, sorting, and routing. To interact with hardware, the
+caller obtains a `tt_session_t` via `tt_open()`, which holds the open file
+descriptor for the lifetime of the session. Sessions are released with
+`tt_close()`.
 
 This design enables:
 
 - **Stack allocation** without heap management.
-- **Clear ownership** semantics (user owns the struct).
-- **Cheap copying** of devices (shallow copies are valid).
+- **Clear ownership** semantics (user owns the structs).
+- **Cheap copying** of descriptors (shallow copies are valid).
 - **Efficient reuse** of file descriptors across operations.
 
 The alternative (opaque handles with internal registries) was rejected because
@@ -75,6 +85,8 @@ the stateless principle.
 >
 > An issue with the current design using device numbers as an identifier is that
 > post-reset, these identifiers may be reassigned to different physical devices.
+> A session is invalidated by `tt_reset()` on its underlying device; the caller
+> must close any open sessions before reset and re-open afterward.
 >
 > This will hopefully be addressed and have the implementation changed in a
 > future update.
@@ -129,7 +141,7 @@ return tt_errno = TT_EINVAL, -1;
 **Error checking pattern**:
 ```c
 // Check for failure, then inspect tt_errno
-if (tt_dev_open(&dev) < 0) {
+if (tt_open(&dev, &sess) < 0) {
     const char *msg = tt_error_describe(tt_errno);
     fprintf(stderr, "Open failed: %s\n", msg);
 }
@@ -165,27 +177,29 @@ caller or mapped from kernel resources.
 
 #### Device Lifecycle
 
-Devices follow an **explicit open/close model** where all operations internally
-ensure the device is open before use. Notably, operations will never implicitly
-open a device.
+Devices follow an **explicit open/close model**. A `tt_device_t` is just an
+identifier. To perform operations the caller opens a `tt_session_t` via
+`tt_open()` and releases it with `tt_close()`. Operations never implicitly
+open a session.
 
 ```c
-tt_device_t dev = { .id = 0, .fd = -1 };
-if (tt_dev_open(&dev) < 0) {
+tt_device_t dev = { .id = 0 };
+tt_session_t sess;
+if (tt_open(&dev, &sess) < 0) {
     // Handle error
 }
 
-// Use device for multiple operations
-tt_dev_get_info(&dev, &info);
-tt_tlb_alloc(&dev, TT_TLB_2MB, TT_TLB_UC, &tlb);
+// Use session for multiple operations
+tt_dev_info(&sess, &info);
+tt_tlb_alloc(&sess, TT_TLB_2MB, TT_TLB_UC, &tlb);
 
 // Explicit cleanup
-tt_dev_close(&dev);
+tt_close(&sess);
 ```
 
 This gives users control over when to release resources while avoiding repeated
-open/close overhead on every operation. Functions return `TT_ENOTOPEN` if called
-on a unopened device.
+open/close overhead on every operation. Functions return `TT_ENOTOPEN` if
+called on a closed session.
 
 #### TLB Lifecycle Safety
 
@@ -267,7 +281,7 @@ descriptor. Contributions are aggregated across clients (OR for flags, MAX for
 settings) and pushed to firmware. When a client closes its fd, its contribution
 is removed.
 
-Opening a device with `O_APPEND` (as `tt_dev_open()` does) starts with an
+Opening a device with `O_APPEND` (as `tt_open()` does) starts with an
 all-off initial state, meaning the client must explicitly request power features
 via `tt_power()`. This is the **power-aware client** model.
 

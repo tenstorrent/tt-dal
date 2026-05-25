@@ -13,21 +13,20 @@
 ///
 /// Issues an ASIC reset, monitors sysfs for completion, then locates the
 /// device by BDF (the device number may change after reset) and issues the
-/// post-reset `ioctl`. Always uses a fresh `fd` so that reset works even if the
-/// existing `fd` is corrupted.
+/// post-reset `ioctl`. Opens a temporary session for the operation so that
+/// reset works without requiring the caller to manage an open session.
 int tt_reset(tt_device_t *dev) {
     // Validate args
     if (!dev)
         return tt_errno = TT_EINVAL, TT_ERR;
 
-    // Close existing `fd`.
+    // Open temporary session for reset.
     //
-    // Reset invalidates all `fd`s and TLBs. Ignore errors; we want reset
-    // to proceed regardless of the current `fd` state.
-    tt_dev_close(dev);
-
-    // Fresh `fd`
-    if (tt_dev_open(dev) < 0)
+    // Reset invalidates all sessions and TLBs; callers must have closed
+    // their own sessions before invoking reset. This temporary session is
+    // used solely to issue the reset ioctls.
+    tt_session_t sess;
+    if (tt_open(dev, &sess) < 0)
         return TT_ERR;
 
     // Record BDF.
@@ -35,8 +34,8 @@ int tt_reset(tt_device_t *dev) {
     // The device number may change after reset, so we record the BDF now
     // to relocate the device once it reappears.
     tt_dev_info_t info;
-    if (tt_dev_info(dev, &info) < 0) {
-        tt_dev_close(dev);
+    if (tt_dev_info(&sess, &info) < 0) {
+        tt_close(&sess);
         return TT_ERR;
     }
 
@@ -61,8 +60,8 @@ int tt_reset(tt_device_t *dev) {
         .in.output_size_bytes = sizeof(req.out),
         .in.flags             = TENSTORRENT_RESET_DEVICE_ASIC_RESET,
     };
-    int res = ioctl(dev->fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req);
-    tt_dev_close(dev);
+    int res = ioctl(sess.fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req);
+    tt_close(&sess);
     if (res != 0 || req.out.result != 0)
         return tt_errno = TT_EIO, TT_ERR;
 
@@ -123,13 +122,13 @@ int tt_reset(tt_device_t *dev) {
         return tt_errno = TT_ENODEV, TT_ERR;
 
     // Issue post-reset
-    if (tt_dev_open(dev) < 0)
+    if (tt_open(dev, &sess) < 0)
         return TT_ERR;
 
     // Configure and issue
     req.in.flags = TENSTORRENT_RESET_DEVICE_POST_RESET;
-    res          = ioctl(dev->fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req);
-    tt_dev_close(dev);
+    res          = ioctl(sess.fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req);
+    tt_close(&sess);
     if (res != 0 || req.out.result != 0)
         return tt_errno = TT_EIO, TT_ERR;
 

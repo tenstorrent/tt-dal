@@ -15,7 +15,7 @@
 // Resolve a device spec to a tt_device_t.
 //
 // Accepts a /dev/tenstorrent/N path or a PCI BDF string (DDDD:BB:DD.F or
-// BB:DD.F). Returns 0 with `dev->id` set and `dev->fd` = -1, or -1 on error.
+// BB:DD.F). Returns 0 with `dev->id` set, or -1 on error.
 static int device_from_spec(const char *spec, tt_device_t *dev) {
     if (strchr(spec, '/'))
         return tt_dev_from_path(spec, dev);
@@ -50,14 +50,14 @@ print_state(int ndevs, tt_device_t devs[static ndevs], uint16_t mask) {
     printf("\n");
 }
 
-// Close a device, reporting any failure
-static void close_or_warn(const char *prog, tt_device_t *dev) {
-    if (tt_dev_close(dev) < 0)
+// Close a session, reporting any failure
+static void close_or_warn(const char *prog, tt_session_t *sess) {
+    if (tt_close(sess) < 0)
         fprintf(
             stderr,
             "%s: error: device %u: close failed: %s\n",
             prog,
-            dev->id,
+            sess->dev.id,
             tt_error_describe(tt_errno)
         );
 }
@@ -117,9 +117,10 @@ int main(int argc, char *argv[]) {
         ndevs++;
     }
 
-    // Open all devices
+    // Open a session for each device
+    tt_session_t sessions[MAX_DEVS];
     for (int i = 0; i < ndevs; i++) {
-        if (tt_dev_open(&devs[i]) < 0) {
+        if (tt_open(&devs[i], &sessions[i]) < 0) {
             fprintf(
                 stderr,
                 "%s: error: device %u: %s\n",
@@ -128,7 +129,7 @@ int main(int argc, char *argv[]) {
                 tt_error_describe(tt_errno)
             );
             for (int j = 0; j < i; j++)
-                close_or_warn(prog, &devs[j]);
+                close_or_warn(prog, &sessions[j]);
             return 1;
         }
     }
@@ -197,7 +198,7 @@ int main(int argc, char *argv[]) {
         uint16_t new_mask = mask ^ (uint16_t)FLAGS[idx].flag;
         int ok            = 1;
         for (int i = 0; i < ndevs; i++) {
-            if (tt_power(&devs[i], new_mask) < 0) {
+            if (tt_power(&sessions[i], new_mask) < 0) {
                 fprintf(
                     stderr,
                     "%s: error: device %u: %s\n",
@@ -214,9 +215,9 @@ int main(int argc, char *argv[]) {
         print_state(ndevs, devs, mask);
     }
 
-    // Close all devices
+    // Close all sessions
     for (int i = 0; i < ndevs; i++)
-        close_or_warn(prog, &devs[i]);
+        close_or_warn(prog, &sessions[i]);
 
     return 0;
 }

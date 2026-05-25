@@ -6,10 +6,10 @@
 
 // MARK: hardware
 int main(void) {
-    tt_device_t devs[1];
+    tt_session_t s;
     // Verify at least one device is discoverable and openable
-    tt_device_t *dev = open_test_device(devs);
-    if (!dev)
+    tt_session_t *sess = open_test_device(&s);
+    if (!sess)
         return EXIT_FAILURE;
-    tt_dev_close(dev);
+    tt_close(sess);
 }

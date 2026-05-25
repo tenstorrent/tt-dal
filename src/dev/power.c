@@ -9,13 +9,13 @@
 ///
 /// Issues the `SET_POWER_STATE` `ioctl` with all four defined flag bits
 /// marked valid. Any flag not set in `flags` is explicitly turned off.
-int tt_power(const tt_device_t *dev, uint16_t flags) {
+int tt_power(const tt_session_t *sess, uint16_t flags) {
     // Validate args
-    if (!dev)
+    if (!sess)
         return tt_errno = TT_EINVAL, TT_ERR;
 
     // Ensure open
-    if (dev->fd < 0)
+    if (sess->fd < 0)
         return tt_errno = TT_ENOTOPEN, TT_ERR;
 
     // Build `ioctl` struct.
@@ -31,7 +31,7 @@ int tt_power(const tt_device_t *dev, uint16_t flags) {
     };
 
     // Issue `ioctl`
-    if (ioctl(dev->fd, TENSTORRENT_IOCTL_SET_POWER_STATE, &power) != 0)
+    if (ioctl(sess->fd, TENSTORRENT_IOCTL_SET_POWER_STATE, &power) != 0)
         return tt_errno = TT_EIO, TT_ERR;
 
     return TT_OK;

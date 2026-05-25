@@ -6,14 +6,14 @@
 
 // MARK: hardware
 int main(void) {
-    tt_device_t devs[1];
-    tt_device_t *dev = open_test_device(devs);
-    if (!dev)
+    tt_session_t s;
+    tt_session_t *sess = open_test_device(&s);
+    if (!sess)
         return EXIT_FAILURE;
     tt_version_t ver;
-    int rc = tt_version_firmware(dev, &ver);
+    int rc = tt_version_firmware(sess, &ver);
     // Firmware version should be at least 19.x
     if (rc == 0)
         assert(ver.major >= 19);
-    tt_dev_close(dev);
+    tt_close(sess);
 }

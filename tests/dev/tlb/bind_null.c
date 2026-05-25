@@ -5,7 +5,7 @@
 
 int main(void) {
     tt_tlb_t tlb;
-    // NULL device pointer must be rejected
+    // NULL session pointer must be rejected
     assert(tt_tlb_bind(NULL, &tlb, NULL) < 0);
     assert(tt_errno == TT_EINVAL);
 }

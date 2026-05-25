@@ -6,11 +6,11 @@
 
 // MARK: hardware
 int main(void) {
-    tt_device_t devs[1];
-    tt_device_t *dev = open_test_device(devs);
-    if (!dev)
+    tt_session_t s;
+    tt_session_t *sess = open_test_device(&s);
+    if (!sess)
         return EXIT_FAILURE;
     // Successful open must produce a valid file descriptor
-    assert(dev->fd >= 0);
-    tt_dev_close(dev);
+    assert(sess->fd >= 0);
+    tt_close(sess);
 }

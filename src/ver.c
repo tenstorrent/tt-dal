@@ -25,15 +25,16 @@ int tt_version_driver(tt_version_t *version) {
     tt_device_t dev;
     if (tt_dev_scan(1, &dev) <= 0)
         return tt_errno = TT_ENODEV, TT_ERR;
-    if (tt_dev_open(&dev) < 0)
+    tt_session_t sess;
+    if (tt_open(&dev, &sess) < 0)
         return TT_ERR;
 
     // Query driver info
     struct tenstorrent_get_driver_info query = {
         .in.output_size_bytes = sizeof(query.out),
     };
-    int res = ioctl(dev.fd, TENSTORRENT_IOCTL_GET_DRIVER_INFO, &query);
-    tt_dev_close(&dev);
+    int res = ioctl(sess.fd, TENSTORRENT_IOCTL_GET_DRIVER_INFO, &query);
+    tt_close(&sess);
     if (res != 0)
         return tt_errno = TT_EIO, TT_ERR;
 
@@ -51,13 +52,13 @@ int tt_version_driver(tt_version_t *version) {
 ///
 /// Reads the version from a per-device attribute and parses it into a
 /// `tt_version_t`.
-int tt_version_firmware(const tt_device_t *dev, tt_version_t *version) {
+int tt_version_firmware(const tt_session_t *sess, tt_version_t *version) {
     // Validate args
-    if (!dev || !version)
+    if (!sess || !version)
         return tt_errno = TT_EINVAL, TT_ERR;
 
-    // Ensure device is open
-    if (dev->fd < 0)
+    // Ensure session is open
+    if (sess->fd < 0)
         return tt_errno = TT_ENOTOPEN, TT_ERR;
 
     // Build sysfs path
@@ -66,7 +67,7 @@ int tt_version_firmware(const tt_device_t *dev, tt_version_t *version) {
         path,
         sizeof(path),
         "/sys/class/tenstorrent/tenstorrent!%u/tt_fw_bundle_ver",
-        dev->id
+        sess->dev.id
     );
 
     // Read version string

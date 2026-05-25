@@ -11,24 +11,24 @@
 /// Allocates TLB via `ioctl`. Does not `mmap` yet; `ptr == NULL` until
 /// `tt_tlb_bind()` is called.
 int tt_tlb_alloc(
-    const tt_device_t *dev,
+    const tt_session_t *sess,
     tt_tlb_size_t size,
     tt_tlb_cache_mode_t mode,
     tt_tlb_t *tlb
 ) {
     // Validate args
-    if (!dev || !tlb)
+    if (!sess || !tlb)
         return tt_errno = TT_EINVAL, TT_ERR;
 
-    // Ensure device is open
-    if (dev->fd < 0)
+    // Ensure session is open
+    if (sess->fd < 0)
         return tt_errno = TT_ENOTOPEN, TT_ERR;
 
     // Allocate TLB
     struct tenstorrent_allocate_tlb alloc = {
         .in.size = (size_t)size,
     };
-    if (ioctl(dev->fd, TENSTORRENT_IOCTL_ALLOCATE_TLB, &alloc) != 0)
+    if (ioctl(sess->fd, TENSTORRENT_IOCTL_ALLOCATE_TLB, &alloc) != 0)
         return tt_errno = TT_ENOMEM, TT_ERR;
 
     // Populate TLB
@@ -60,7 +60,7 @@ int tt_tlb_alloc(
 
 cleanup:
     // Free the newly allocated TLB
-    tt_tlb_free(dev, tlb);
+    tt_tlb_free(sess, tlb);
 
 failure:
     return TT_ERR;
@@ -71,14 +71,14 @@ failure:
 /// `mmap`s TLB on first call. On rebind, `munmap`s old and remaps new to
 /// invalidate stale interior pointers.
 int tt_tlb_bind(
-    const tt_device_t *dev, tt_tlb_t *tlb, const tt_tlb_config_t *cfg
+    const tt_session_t *sess, tt_tlb_t *tlb, const tt_tlb_config_t *cfg
 ) {
     // Validate args
-    if (!dev || !tlb || !cfg)
+    if (!sess || !tlb || !cfg)
         return tt_errno = TT_EINVAL, TT_ERR;
 
-    // Ensure device is open
-    if (dev->fd < 0)
+    // Ensure session is open
+    if (sess->fd < 0)
         return tt_errno = TT_ENOTOPEN, TT_ERR;
 
     // Map TLB into user space.
@@ -88,7 +88,7 @@ int tt_tlb_bind(
     // any stale interior pointers users may have saved. (Traps with `SIGSEGV`
     // rather than silently accessing different device memory).
     void *ptr = mmap(
-        NULL, tlb->len, PROT_READ | PROT_WRITE, MAP_SHARED, dev->fd, tlb->idx
+        NULL, tlb->len, PROT_READ | PROT_WRITE, MAP_SHARED, sess->fd, tlb->idx
     );
     if (ptr == MAP_FAILED) {
         // `mmap` failed
@@ -111,7 +111,7 @@ int tt_tlb_bind(
         .in.config.linked    = cfg->linked,
         .in.config.static_vc = cfg->static_vc,
     };
-    if (ioctl(dev->fd, TENSTORRENT_IOCTL_CONFIGURE_TLB, &mapping) != 0) {
+    if (ioctl(sess->fd, TENSTORRENT_IOCTL_CONFIGURE_TLB, &mapping) != 0) {
         // `ioctl` failed
         tt_errno = TT_EINVAL;
         // Unmap the new mapping we just created before cleaning up the old
@@ -144,13 +144,13 @@ failure:
 /// Free a TLB window.
 ///
 /// `munmap`s TLB from user space (if mapped) then frees via `ioctl`.
-int tt_tlb_free(const tt_device_t *dev, tt_tlb_t *tlb) {
+int tt_tlb_free(const tt_session_t *sess, tt_tlb_t *tlb) {
     // Validate args
-    if (!dev || !tlb)
+    if (!sess || !tlb)
         return tt_errno = TT_EINVAL, TT_ERR;
 
-    // Ensure device is open
-    if (dev->fd < 0)
+    // Ensure session is open
+    if (sess->fd < 0)
         return tt_errno = TT_ENOTOPEN, TT_ERR;
 
     // Unmap TLB.
@@ -164,7 +164,7 @@ int tt_tlb_free(const tt_device_t *dev, tt_tlb_t *tlb) {
     struct tenstorrent_free_tlb free = {
         .in.id = tlb->id,
     };
-    if (ioctl(dev->fd, TENSTORRENT_IOCTL_FREE_TLB, &free) != 0)
+    if (ioctl(sess->fd, TENSTORRENT_IOCTL_FREE_TLB, &free) != 0)
         return tt_errno = TT_EINVAL, TT_ERR;
     tlb->id = 0;
 
