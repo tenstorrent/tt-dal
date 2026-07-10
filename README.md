@@ -44,7 +44,7 @@ for detailed philosophy and design decisions.
 
 ### Prerequisites
 
-- [tt-kmd] kernel driver must be installed and loaded
+- [tt-kmd] kernel driver (version 2.10+) must be installed and loaded
 - CMake 3.21+
 
 ### Building

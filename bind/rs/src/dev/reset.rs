@@ -1,14 +1,15 @@
 //! Device reset.
 //!
-//! Resets the device back to its initial state. The reset operation consumes
-//! the [`Session`], enforcing at the type level that the caller cannot use the
-//! session after issuing a reset. Returns an updated [`Device`] descriptor
-//! reflecting any post-reset device-number change.
+//! Resets the device back to its initial state. Reset acquires exclusive
+//! access to the device internally, so it is refused while any other client
+//! holds the device. A reset never destroys another client's session out
+//! from under it.
 //!
 //! # Usage
 //!
-//! Reset the device with [`Session::reset()`], which consumes the session and
-//! returns a fresh [`Device`] descriptor.
+//! Reset an unopened device with [`Device::reset()`], or consume an open
+//! session with [`Session::reset()`], which enforces at the type level that
+//! the caller cannot use the session after issuing a reset.
 //!
 //! ```no_run
 //! # use ttdal::dev::Device;
@@ -31,22 +32,24 @@ use crate::{Result, err};
 impl Session {
     /// Resets the device.
     ///
-    /// Closes this session, performs the reset, and returns the updated
-    /// [`Device`] descriptor. The device number may have changed after reset;
-    /// the returned descriptor reflects the new identifier.
+    /// Closes this session, then resets the underlying device as
+    /// [`Device::reset()`] does. The reset runs in place, so the device
+    /// number does not change and the returned [`Device`] descriptor can be
+    /// reopened directly.
     ///
     /// # Errors
     ///
-    /// Returns an error if the kernel driver rejects the close or reset
-    /// request.
+    /// Returns an error if the kernel driver rejects the reset request, or
+    /// with `TT_EBUSY` if another client opened the device before exclusive
+    /// access could be acquired. The session is consumed even on error.
     pub fn reset(self) -> Result<Device> {
         let mut this = std::mem::ManuallyDrop::new(self);
         // SAFETY: `ManuallyDrop` prevents `Drop` from running, so `tt_close`
-        // is called exactly once here.
+        // runs exactly once here; the device is reset after its fd is closed.
         err::check(unsafe { ffi::tt_close(&raw mut this.0) })?;
-        let mut dev = this.0.dev;
+        let dev = this.0.dev;
         // SAFETY: `dev` is a valid device descriptor.
-        err::check(unsafe { ffi::tt_reset(&raw mut dev) })?;
+        err::check(unsafe { ffi::tt_reset(&raw const dev) })?;
         Ok(Device(dev))
     }
 }
@@ -54,16 +57,17 @@ impl Session {
 impl Device {
     /// Resets the device.
     ///
-    /// Updates `self.id` if the kernel reassigns the device number after
-    /// reset. The caller must have closed any open sessions for this device
-    /// before calling; live sessions are invalidated by reset.
+    /// Acquires exclusive access, issues the full reset sequence, and
+    /// releases it. No session is required.
     ///
     /// # Errors
     ///
-    /// Returns an error if the kernel driver rejects the reset request.
-    pub fn reset(&mut self) -> Result<()> {
+    /// Returns an error if the kernel driver rejects the reset request, or
+    /// with `TT_EBUSY` if any client (including this process) has the
+    /// device open.
+    pub fn reset(&self) -> Result<()> {
         // SAFETY: `self.0` is a valid device descriptor.
-        err::check(unsafe { ffi::tt_reset(self.as_mut_ptr()) })
+        err::check(unsafe { ffi::tt_reset(self.as_ptr()) })
     }
 }
 
