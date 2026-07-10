@@ -20,11 +20,10 @@ impl Session {
     /// if another client opened the device before exclusive access could be
     /// acquired. The session is closed even on error.
     pub fn reset(&mut self) -> PyResult<Device> {
-        self.close()?;
-        let dev = self.0.dev;
-        // SAFETY: Dev is a valid device descriptor.
-        crate::err::check(unsafe { ffi::tt_reset(&dev) })?;
-        Ok(Device(dev))
+        // SAFETY: `self.0` is a valid session handle. tt_reset_with consumes
+        // it (setting fd to -1) on all paths, so no double-close can occur.
+        crate::err::check(unsafe { ffi::tt_reset_with(&mut self.0) })?;
+        Ok(Device(self.0.dev))
     }
 }
 

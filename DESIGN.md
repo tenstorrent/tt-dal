@@ -265,9 +265,13 @@ device access.
 
 **TL;DR**: Reset always runs exclusively. `tt_reset()` acquires exclusive
 access internally and fails with `TT_EBUSY` if the device is in use.
+`tt_reset_with()` consumes an open session, then does the same.
+
+Reset comes in two forms:
 
 ```c
 int tt_reset(const tt_device_t *dev);   // No session required
+int tt_reset_with(tt_session_t *sess);  // Consumes the session
 ```
 
 **Exclusivity**: The kernel arbitrates device access at open time as a
@@ -284,6 +288,15 @@ indefinitely (the kernel's blocking exclusive open can be starved by a
 steady stream of plain opens). The issuing descriptor survives the driver's
 reset generation bump, so the sequence runs on one fd with no close/reopen
 window that would drop exclusivity.
+
+**Consumption**: `tt_reset_with()` closes the session first (exclusive
+acquisition requires the device to be idle, so the caller's own descriptor
+must be released), then delegates to `tt_reset()`. The session is consumed
+on all paths, success or failure, exactly as if `tt_close()` had been
+called: a half-reset device behind a maybe-valid file descriptor is a
+silent corruption hazard. Another client may open the device in the window
+between the close and the exclusive acquisition, in which case the reset
+fails with `TT_EBUSY`.
 
 **In place**: The driver keeps the device instance alive across the reset,
 so the device number does not change and descriptors remain valid for

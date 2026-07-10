@@ -294,7 +294,8 @@ typedef struct tt_device {
 /// An owned handle that holds an open file descriptor to a device. Required to
 /// perform any operation that interacts with hardware.
 ///
-/// Obtain via `tt_open()`; release via `tt_close()`. A handle is also
+/// Obtain via `tt_open()`; release via `tt_close()`, or by passing to
+/// `tt_reset_with()`, which consumes the session. A handle is also
 /// invalidated by an out-of-band device reset or removal.
 typedef struct tt_session {
     /// Device descriptor for this session.
@@ -875,7 +876,8 @@ int tt_power(const tt_session_t *sess, uint16_t flags);
 /// including descriptors held by the calling process. If the device is
 /// busy, the reset fails with `TT_EBUSY` rather than resetting under other
 /// clients or blocking indefinitely. A reset never destroys another
-/// client's session out from under it.
+/// client's session out from under it. To reset a device the caller has
+/// open, use `tt_reset_with()`.
 ///
 /// The reset runs in place, so the device number does not change.
 ///
@@ -885,6 +887,34 @@ int tt_power(const tt_session_t *sess, uint16_t flags);
 /// @param dev   Device descriptor.
 /// @return      0 on success, -1 on error (check `tt_errno`).
 int tt_reset(const tt_device_t *dev);
+
+/// Trigger device reset via an open session.
+///
+/// Closes the session, then resets the underlying device as `tt_reset()`
+/// does. The session is consumed on all paths, success or failure, just as
+/// if `tt_close()` had been called. `sess->fd` is `-1` on return, and the
+/// device number does not change, so `sess->dev` stays valid for reopening.
+///
+/// Exclusive acquisition requires the device to be idle, so the session is
+/// closed before the reset begins. Another client may open the device in
+/// that window, in which case the reset fails with `TT_EBUSY`.
+///
+/// @param sess  Session handle (consumed).
+/// @return      0 on success, -1 on error (check `tt_errno`).
+///
+/// @par Example
+///
+/// ```c
+/// tt_session_t sess;
+/// if (tt_open(&dev, &sess) < 0)
+///     return -1;
+/// if (tt_reset_with(&sess) < 0)
+///     return -1;  // Session already consumed
+/// tt_open(&sess.dev, &sess);
+/// // ... use fresh session ...
+/// tt_close(&sess);
+/// ```
+int tt_reset_with(tt_session_t *sess);
 
 #ifdef __cplusplus
 }

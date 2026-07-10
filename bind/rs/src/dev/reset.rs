@@ -44,13 +44,11 @@ impl Session {
     /// access could be acquired. The session is consumed even on error.
     pub fn reset(self) -> Result<Device> {
         let mut this = std::mem::ManuallyDrop::new(self);
-        // SAFETY: `ManuallyDrop` prevents `Drop` from running, so `tt_close`
-        // runs exactly once here; the device is reset after its fd is closed.
-        err::check(unsafe { ffi::tt_close(&raw mut this.0) })?;
-        let dev = this.0.dev;
-        // SAFETY: `dev` is a valid device descriptor.
-        err::check(unsafe { ffi::tt_reset(&raw const dev) })?;
-        Ok(Device(dev))
+        // SAFETY: `ManuallyDrop` prevents `Drop` from running, and
+        // `tt_reset_with` consumes the session (closing its fd) on all
+        // paths, so the fd is closed exactly once.
+        err::check(unsafe { ffi::tt_reset_with(&raw mut this.0) })?;
+        Ok(Device(this.0.dev))
     }
 }
 
