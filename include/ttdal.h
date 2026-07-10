@@ -294,8 +294,8 @@ typedef struct tt_device {
 /// An owned handle that holds an open file descriptor to a device. Required to
 /// perform any operation that interacts with hardware.
 ///
-/// Obtain via `tt_open()`; release via `tt_close()`. A handle is invalidated by
-/// `tt_reset()` on its underlying device.
+/// Obtain via `tt_open()`; release via `tt_close()`. A handle is also
+/// invalidated by an out-of-band device reset or removal.
 typedef struct tt_session {
     /// Device descriptor for this session.
     tt_device_t dev;
@@ -391,7 +391,9 @@ ssize_t tt_dev_scan(size_t cap, tt_device_t buf[static cap]);
 /// Open a session handle for a device.
 ///
 /// Opens the underlying device and initializes the session handle for use.
-/// The session struct is reusable: it may be reopened after `tt_close()`.
+/// The open blocks while another client holds the device exclusively (e.g.
+/// during `tt_reset()` or a flash sequence). The session struct is reusable:
+/// it may be reopened after `tt_close()`.
 ///
 /// @param dev       Device descriptor.
 /// @param[out] sess Session handle to initialize.
@@ -865,18 +867,24 @@ int tt_power(const tt_session_t *sess, uint16_t flags);
 
 /// Trigger device reset.
 ///
-/// Initiates a reset sequence. Opens a temporary file descriptor internally so
-/// that reset works without needing a session. After the ASIC reset, polls
-/// until the device reappears and issues the post-reset `ioctl`. The device
-/// number may change after reset; `dev->id` is updated to reflect the new ID.
+/// Acquires exclusive access to the device, issues the full reset sequence
+/// (ASIC reset, completion wait, post-reset), and releases it. The caller
+/// does not need an open session.
 ///
-/// All sessions and TLBs for this device are invalidated by reset; the caller
-/// is responsible for closing any open sessions beforehand and reopening
-/// fresh sessions afterward.
+/// Acquisition succeeds only when no other client has the device open,
+/// including descriptors held by the calling process. If the device is
+/// busy, the reset fails with `TT_EBUSY` rather than resetting under other
+/// clients or blocking indefinitely. A reset never destroys another
+/// client's session out from under it.
+///
+/// The reset runs in place, so the device number does not change.
+///
+/// This requires `tt-kmd` 2.10 or later, which arbitrates exclusive access
+/// at open time. The requirement is not checked at runtime.
 ///
 /// @param dev   Device descriptor.
 /// @return      0 on success, -1 on error (check `tt_errno`).
-int tt_reset(tt_device_t *dev);
+int tt_reset(const tt_device_t *dev);
 
 #ifdef __cplusplus
 }

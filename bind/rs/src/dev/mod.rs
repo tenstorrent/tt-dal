@@ -148,6 +148,9 @@ impl Device {
 
     /// Opens the device and returns a [`Session`] handle.
     ///
+    /// Blocks while another client holds the device exclusively (e.g.
+    /// during a reset or a flash sequence).
+    ///
     /// # Errors
     ///
     /// Returns an error if the kernel driver fails to open the device.

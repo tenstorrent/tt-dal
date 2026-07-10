@@ -91,9 +91,10 @@ int main(int argc, char *argv[]) {
 
     // Reset each device.
     //
-    // `tt_reset()` issues the ASIC reset, waits for the device to reappear,
-    // and issues the post-reset `ioctl` before returning. `dev->id` is updated
-    // to the new device number if it changed after reset.
+    // `tt_reset()` acquires exclusive access internally, so a reset is
+    // refused (`TT_EBUSY`) while any other client holds the device. It
+    // issues the ASIC reset, waits for completion, and issues the
+    // post-reset `ioctl` before returning.
     int failed = 0;
     for (int i = 0; i < ndevs; i++) {
         printf("%s: resetting device %u...\n", prog, devs[i].id);

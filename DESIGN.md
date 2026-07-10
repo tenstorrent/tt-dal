@@ -83,13 +83,11 @@ the stateless principle.
 
 > [!CAUTION]
 >
-> An issue with the current design using device numbers as an identifier is that
-> post-reset, these identifiers may be reassigned to different physical devices.
-> A session is invalidated by `tt_reset()` on its underlying device; the caller
-> must close any open sessions before reset and re-open afterward.
->
-> This will hopefully be addressed and have the implementation changed in a
-> future update.
+> Device numbers are only reassigned when a device is removed and re-probed
+> (e.g. an out-of-band remove/rescan). `tt_reset()` performs the reset in
+> place, so the device number does not change and descriptors remain valid
+> for reopening. Descriptors held across an out-of-band re-probe may go
+> stale and must be refreshed via `tt_dev_scan()`.
 
 #### Resource Handles
 
@@ -119,6 +117,19 @@ Implementation for features that differ across architectures is handled with
 explicit dispatch at each site that needs it (e.g. telemetry selects its
 per-architecture constants with a `switch`), keeping differences visible and
 localized.
+
+#### Kernel Driver Requirement
+
+**TL;DR**: Requires `tt-kmd` >= 2.10. Documented, not enforced at runtime.
+
+The library depends on driver semantics introduced in `tt-kmd` 2.10:
+open-time exclusive arbitration (`O_EXCL`) and reset-issuing file descriptors
+surviving the reset generation bump. Older drivers silently ignore `O_EXCL`
+on the device file, leaving `tt_reset()` unfenced.
+
+Runtime version checks are policy, not mechanism, so the library performs
+none. The requirement is documented here, in the README, and as comments at
+each site in the source that depends on a versioned driver feature.
 
 ### API Conventions
 
@@ -250,24 +261,46 @@ prioritizes **safety over performance**. Users building TLB pools can amortize
 allocation cost. Binding is expected to be infrequent relative to actual
 device access.
 
-#### Reset Infallibility
+#### Reset Semantics
 
-**TL;DR**: Reset works even if device or driver is in a bad state. Never relies
-on the existing fd.
+**TL;DR**: Reset always runs exclusively. `tt_reset()` acquires exclusive
+access internally and fails with `TT_EBUSY` if the device is in use.
 
-Device reset must work even when the device or driver is in a bad state. The
-implementation never relies on the existing `fd` field of `tt_device_t`.
+```c
+int tt_reset(const tt_device_t *dev);   // No session required
+```
 
-This ensures reset works even if:
+**Exclusivity**: The kernel arbitrates device access at open time as a
+reader/writer lock, where `O_EXCL` is the writer and plain opens are
+readers (KMD 2.10 or later). `tt_reset()` opens the device with
+`O_EXCL | O_NONBLOCK`, runs the full sequence (ASIC reset through
+post-reset) on that descriptor, and closes it. Acquisition succeeds only
+when no other client has the device open, so a reset never destroys another
+client's session out from under it.
 
-- The existing `fd` is corrupted or stale.
-- Previous operations left the fd in an undefined state.
-- The device was already in a bad state requiring reset.
+Acquisition does not wait: if the device is busy, reset fails with
+`TT_EBUSY` rather than resetting under other clients or blocking
+indefinitely (the kernel's blocking exclusive open can be starved by a
+steady stream of plain opens). The issuing descriptor survives the driver's
+reset generation bump, so the sequence runs on one fd with no close/reopen
+window that would drop exclusivity.
 
-**Philosophy**: Reset is inherently messy (invalidates all fds and TLBs,
-unavoidable races). Don't try to make it perfectly safe, just ensure the reset
-operation itself can always execute. Users must accept that reset invalidates
-all existing handles.
+**In place**: The driver keeps the device instance alive across the reset,
+so the device number does not change and descriptors remain valid for
+reopening once the reset returns.
+
+> [!NOTE]
+>
+> While a reset (or any future exclusive holder, e.g. a flasher) holds the
+> device, all other opens block until it is released, and the kernel
+> provides no bypass. Recovery from a hung exclusive holder is out-of-band
+> (sysfs remove, BMC) and beyond this library.
+
+**Philosophy**: Reset is inherently disruptive (it invalidates all TLBs and
+device state). Rather than making a forced reset maximally available, the
+API makes the safe reset the only reset: exclusivity is acquired internally
+and refusal is loud. Force and blocking variants may be added later as
+explicit opt-ins.
 
 ### API Design
 

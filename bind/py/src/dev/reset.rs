@@ -11,17 +11,19 @@ use super::{Device, Session};
 impl Session {
     /// Resets the device.
     ///
-    /// Closes this session, performs the reset, and returns an updated
-    /// `Device` descriptor. The device number may have changed after reset;
-    /// the returned descriptor reflects the new identifier.
+    /// Closes this session, then resets the underlying device as
+    /// `Device.reset()` does. The session is closed on all paths, success
+    /// or failure. The device number does not change, so the returned
+    /// `Device` descriptor can be reopened directly.
     ///
-    /// Returns an error if the kernel driver rejects the close or reset
-    /// request.
+    /// Returns an error if the kernel driver rejects the reset request, or
+    /// if another client opened the device before exclusive access could be
+    /// acquired. The session is closed even on error.
     pub fn reset(&mut self) -> PyResult<Device> {
         self.close()?;
-        let mut dev = self.0.dev;
+        let dev = self.0.dev;
         // SAFETY: Dev is a valid device descriptor.
-        crate::err::check(unsafe { ffi::tt_reset(&mut dev) })?;
+        crate::err::check(unsafe { ffi::tt_reset(&dev) })?;
         Ok(Device(dev))
     }
 }
@@ -30,14 +32,15 @@ impl Session {
 impl Device {
     /// Resets the device.
     ///
-    /// Updates the underlying device ID if the kernel reassigns it after
-    /// reset. The caller must have closed any open sessions for this device
-    /// beforehand; live sessions are invalidated by reset.
+    /// Acquires exclusive access, issues the full reset sequence, and
+    /// releases it. No session is required. The reset is refused while any
+    /// client (including this process) has the device open.
     ///
-    /// Returns an error if the kernel driver rejects the reset request.
+    /// Returns an error if the kernel driver rejects the reset request or
+    /// the device is busy.
     #[pyo3(name = "reset")]
-    pub fn reset_(&mut self) -> PyResult<()> {
+    pub fn reset_(&self) -> PyResult<()> {
         // SAFETY: `self.0` is a valid device descriptor.
-        crate::err::check(unsafe { ffi::tt_reset(&mut self.0) })
+        crate::err::check(unsafe { ffi::tt_reset(&self.0) })
     }
 }

@@ -3,6 +3,7 @@
 #include "ioctl.h"
 #include "ttdal.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
@@ -11,32 +12,43 @@
 
 /// Reset device.
 ///
-/// Issues an ASIC reset, monitors sysfs for completion, then locates the
-/// device by BDF (the device number may change after reset) and issues the
-/// post-reset `ioctl`. Opens a temporary session for the operation so that
-/// reset works without requiring the caller to manage an open session.
-int tt_reset(tt_device_t *dev) {
+/// Acquires exclusive access to the device, issues an ASIC reset, monitors
+/// sysfs for completion, issues the post-reset `ioctl`, and releases the
+/// device. Exclusive acquisition guarantees no other client's session is
+/// destroyed by the reset.
+int tt_reset(const tt_device_t *dev) {
     // Validate args
     if (!dev)
         return tt_errno = TT_EINVAL, TT_ERR;
 
-    // Open temporary session for reset.
+    // Acquire exclusive access.
     //
-    // Reset invalidates all sessions and TLBs; callers must have closed
-    // their own sessions before invoking reset. This temporary session is
-    // used solely to issue the reset ioctls.
-    tt_session_t sess;
-    if (tt_open(dev, &sess) < 0)
-        return TT_ERR;
+    // Requires KMD >= 2.10: the driver arbitrates access at open time as a
+    // reader/writer lock, `O_EXCL` being the writer. Acquisition succeeds
+    // only when no other client has the device open, so a reset never
+    // destroys another client's session out from under it. `O_NONBLOCK`
+    // fails with `EAGAIN` (mapped to `TT_EBUSY`) instead of waiting: a
+    // blocking exclusive open can be starved by a steady stream of plain
+    // opens. Older drivers silently ignore `O_EXCL`, leaving the reset
+    // unfenced.
+    char path[32];
+    snprintf(path, sizeof(path), "/dev/tenstorrent/%u", dev->id);
+    int fd = open(path, O_RDWR | O_CLOEXEC | O_APPEND | O_EXCL | O_NONBLOCK);
+    if (fd < 0)
+        return tt_errno = (errno == EAGAIN) ? TT_EBUSY : TT_ENODEV, TT_ERR;
+
+    // Wrap in temporary session
+    tt_session_t sess = { .dev = *dev, .fd = fd };
 
     // Record BDF.
     //
-    // The device number may change after reset, so we record the BDF now
-    // to relocate the device once it reappears.
+    // Used to locate the device's PCI config space in sysfs for completion
+    // polling below.
     tt_dev_info_t info;
     if (tt_dev_info(&sess, &info) < 0) {
-        tt_close(&sess);
-        return TT_ERR;
+        tt_error_t err = tt_errno;
+        close(fd);
+        return tt_errno = err, TT_ERR;
     }
 
     // Format BDF string
@@ -55,22 +67,28 @@ int tt_reset(tt_device_t *dev) {
     char sysfs_path[64];
     snprintf(sysfs_path, sizeof(sysfs_path), "/sys/bus/pci/devices/%s", bdf);
 
-    // Issue reset
+    // Issue reset.
+    //
+    // Requires KMD >= 2.10: the issuing fd survives the driver's reset
+    // generation bump, so the same fd issues the post-reset `ioctl` below
+    // with no close/reopen window that would drop exclusivity. The reset
+    // runs in place, so the device instance stays alive and the device
+    // number does not change.
     struct tenstorrent_reset_device req = {
         .in.output_size_bytes = sizeof(req.out),
         .in.flags             = TENSTORRENT_RESET_DEVICE_ASIC_RESET,
     };
-    int res = ioctl(sess.fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req);
-    tt_close(&sess);
-    if (res != 0 || req.out.result != 0)
-        return tt_errno = TT_EIO, TT_ERR;
+    if (ioctl(fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req) != 0 ||
+        req.out.result != 0)
+        return close(fd), tt_errno = TT_EIO, TT_ERR;
 
     // Wait for reset completion.
     //
-    // Most resets cause the device to disappear from the PCI bus and
-    // reappear; we detect completion by watching for that cycle via sysfs.
     // For in-place resets (device stays on bus), we check bit 6 of PCI
     // command register (offset 4): the driver clears it when reset is done.
+    // If the device disappears from the bus (an out-of-band removal), wait
+    // for it to reappear. The post-reset ioctl below then fails loudly on
+    // the dead fd rather than targeting a re-probed instance.
     bool device_disappeared = false;
     bool reset_complete     = false;
     time_t start            = time(NULL);
@@ -101,35 +119,16 @@ int tt_reset(tt_device_t *dev) {
         usleep(100000);
     }
     if (!reset_complete)
-        return tt_errno = TT_ETIMEDOUT, TT_ERR;
+        return close(fd), tt_errno = TT_ETIMEDOUT, TT_ERR;
 
-    // Relocate device.
-    //
-    // Scan by BDF; device number may have changed after reset. Allow up
-    // to 10 seconds since firmware initialization can be slow.
-    start          = time(NULL);
-    bool relocated = false;
-    while (time(NULL) - start < 10) {
-        tt_device_t found;
-        if (tt_dev_from_bdf(bdf, &found) == 0) {
-            dev->id   = found.id;
-            relocated = true;
-            break;
-        }
-        usleep(200000);
-    }
-    if (!relocated)
-        return tt_errno = TT_ENODEV, TT_ERR;
-
-    // Issue post-reset
-    if (tt_open(dev, &sess) < 0)
-        return TT_ERR;
-
-    // Configure and issue
+    // Issue post-reset on the surviving fd
     req.in.flags = TENSTORRENT_RESET_DEVICE_POST_RESET;
-    res          = ioctl(sess.fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req);
-    tt_close(&sess);
-    if (res != 0 || req.out.result != 0)
+    if (ioctl(fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req) != 0 ||
+        req.out.result != 0)
+        return close(fd), tt_errno = TT_EIO, TT_ERR;
+
+    // Release exclusive access
+    if (close(fd) != 0)
         return tt_errno = TT_EIO, TT_ERR;
 
     return TT_OK;
