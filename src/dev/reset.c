@@ -133,3 +133,32 @@ int tt_reset(const tt_device_t *dev) {
 
     return TT_OK;
 }
+
+/// Reset device via an open session.
+///
+/// Closes the session, then delegates to `tt_reset()`. The session is
+/// consumed on all paths: a half-reset device behind a maybe-valid file
+/// descriptor is a silent corruption hazard, so failing loudly and forcing
+/// a fresh `tt_open()` is the safe contract.
+int tt_reset_with(tt_session_t *sess) {
+    // Validate args
+    if (!sess)
+        return tt_errno = TT_EINVAL, TT_ERR;
+
+    // Ensure session is open
+    if (sess->fd < 0)
+        return tt_errno = TT_ENOTOPEN, TT_ERR;
+
+    // Consume session.
+    //
+    // Exclusive acquisition in `tt_reset()` succeeds only when no other
+    // descriptor is open, so the caller's own must be released first. On
+    // Linux the fd is freed even when `close(2)` reports an error, so the
+    // session is invalidated unconditionally to uphold the consumed-on-
+    // all-paths contract.
+    if (tt_close(sess) < 0)
+        return sess->fd = -1, TT_ERR;
+
+    // Reset device
+    return tt_reset(&sess->dev);
+}
