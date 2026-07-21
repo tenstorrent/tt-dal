@@ -138,10 +138,12 @@ impl Session {
     /// [`Unsupported`]: std::io::ErrorKind::Unsupported
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn telemetry(&self) -> Result<Telemetry> {
-        let mut table = [0u32; ffi::TT_TELEMETRY_LEN as usize];
-        // SAFETY: `self.0` is an open device and `table` is valid for
-        // `TT_TELEMETRY_LEN` u32 writes.
-        err::check(unsafe { ffi::tt_telemetry(self.as_ptr(), table.as_mut_ptr()) })?;
-        Ok(Telemetry(table))
+        self.call(|sess| {
+            let mut table = [0u32; ffi::TT_TELEMETRY_LEN as usize];
+            // SAFETY: `sess` is an open device and `table` is valid for
+            // `TT_TELEMETRY_LEN` u32 writes.
+            err::check(unsafe { ffi::tt_telemetry(sess.as_ptr(), table.as_mut_ptr()) })?;
+            Ok(Telemetry(table))
+        })
     }
 }

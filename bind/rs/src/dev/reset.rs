@@ -52,12 +52,12 @@ impl Session {
     /// [`TimedOut`]: std::io::ErrorKind::TimedOut
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn reset(self) -> Result<Device> {
-        let mut this = std::mem::ManuallyDrop::new(self);
+        let this = std::mem::ManuallyDrop::new(self);
         // SAFETY: `ManuallyDrop` prevents `Drop` from running, and
         // `tt_reset_with` consumes the session (closing its fd) on all
         // paths, so the fd is closed exactly once.
-        err::check(unsafe { ffi::tt_reset_with(&raw mut this.0) })?;
-        Ok(Device(this.0.dev))
+        err::check(unsafe { ffi::tt_reset_with(this.as_mut_ptr()) })?;
+        Ok(this.dev())
     }
 }
 
