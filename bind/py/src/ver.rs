@@ -80,12 +80,13 @@ pub fn driver(py: Python<'_>) -> PyResult<Py<PyAny>> {
 ///
 /// Other `errno` values propagate from the failing system call.
 #[pyfunction]
-pub fn firmware(sess: &crate::dev::Session, py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let mut raw = std::mem::MaybeUninit::<ffi::tt_version_t>::uninit();
-    // SAFETY: `sess` is an open device and `raw` is a valid out-pointer.
-    crate::err::check(unsafe {
-        ffi::tt_version_firmware(crate::dev::Session::as_ptr(sess), raw.as_mut_ptr())
+pub fn firmware(sess: &mut crate::dev::Session, py: Python<'_>) -> PyResult<Py<PyAny>> {
+    let vers = sess.call(|sess| {
+        let mut raw = std::mem::MaybeUninit::<ffi::tt_version_t>::uninit();
+        // SAFETY: `sess` is an open device and `raw` is a valid out-pointer.
+        crate::err::check(unsafe { ffi::tt_version_firmware(sess, raw.as_mut_ptr()) })?;
+        // SAFETY: `raw` was fully initialized by the successful call above.
+        Ok(unsafe { raw.assume_init() })
     })?;
-    // SAFETY: `raw` was fully initialized by the successful call above.
-    raw_to_semver(py, unsafe { raw.assume_init() })
+    raw_to_semver(py, vers)
 }

@@ -204,11 +204,13 @@ impl Session {
     /// - `ENOTSUP` if the device architecture is unsupported.
     ///
     /// Other `errno` values propagate from the failing system call.
-    pub fn telemetry(&self) -> PyResult<Telemetry> {
-        let mut table = vec![0u32; ffi::TT_TELEMETRY_LEN as usize];
-        // SAFETY: Self is an open device and table.as_mut_ptr() is valid for
-        // TT_TELEMETRY_LEN u32 writes.
-        crate::err::check(unsafe { ffi::tt_telemetry(Session::as_ptr(self), table.as_mut_ptr()) })?;
-        Ok(Telemetry::from_raw(table))
+    pub fn telemetry(&mut self) -> PyResult<Telemetry> {
+        self.call(|sess| {
+            let mut table = vec![0u32; ffi::TT_TELEMETRY_LEN as usize];
+            // SAFETY: `sess` is an open device and table.as_mut_ptr() is valid
+            // for TT_TELEMETRY_LEN u32 writes.
+            crate::err::check(unsafe { ffi::tt_telemetry(sess, table.as_mut_ptr()) })?;
+            Ok(Telemetry::from_raw(table))
+        })
     }
 }
