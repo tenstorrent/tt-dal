@@ -31,7 +31,7 @@ int tt_version_driver(tt_version_t *version) {
     if (found == 0)
         return tt_fail(ENODEV);
     tt_session_t sess;
-    if (tt_open(&dev, &sess) < 0)
+    if (tt_open(&dev, &sess, 0) < 0)
         return TT_ERR;
 
     // Query driver info

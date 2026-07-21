@@ -9,12 +9,12 @@
 //! Send a [`Message`] to the device with [`Session::message()`].
 //!
 //! ```no_run
-//! # use ttdal::dev::{Device, arc::Message};
+//! # use ttdal::dev::{Device, Session, arc::Message};
 //! #
 //! # let dev = Device::scan().unwrap().next().unwrap();
 //! #
 //! // Open a device session
-//! let con = dev.open()?;
+//! let con = Session::open(dev)?;
 //!
 //! // Send a message, print the response
 //! # let msg = Message::default();

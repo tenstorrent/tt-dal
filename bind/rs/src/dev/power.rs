@@ -14,12 +14,12 @@
 //! desired features for this session.
 //!
 //! ```no_run
-//! # use ttdal::dev::{Device, power::{Flag, FlagSet}};
+//! # use ttdal::dev::{Device, Session, power::{Flag, FlagSet}};
 //! #
 //! # let dev = Device::scan().unwrap().next().unwrap();
 //! #
 //! // Open a device session
-//! let con = dev.open()?;
+//! let con = Session::open(dev)?;
 //!
 //! // Request a preset high-power state
 //! con.power(FlagSet::HI)?;

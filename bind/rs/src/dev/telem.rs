@@ -11,11 +11,11 @@
 //! into it using a [`Tag`] variant.
 //!
 //! ```no_run
-//! # use ttdal::dev::{Device, telem::Tag};
+//! # use ttdal::dev::{Device, Session, telem::Tag};
 //! #
 //! # let dev = Device::scan().unwrap().next().unwrap();
 //! #
-//! let sess = dev.open()?;
+//! let sess = Session::open(dev)?;
 //! let telem = sess.telemetry()?;
 //!
 //! let temp = telem[Tag::AsicTemperature];

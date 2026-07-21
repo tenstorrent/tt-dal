@@ -103,7 +103,7 @@ impl Device {
         let mut raw = MaybeUninit::<ffi::tt_session_t>::uninit();
         // SAFETY: `self.0` is a valid device descriptor and raw is a valid
         // out-pointer for tt_session_t.
-        crate::err::check(unsafe { ffi::tt_open(&self.0, raw.as_mut_ptr()) })?;
+        crate::err::check(unsafe { ffi::tt_open(&self.0, raw.as_mut_ptr(), 0) })?;
         // SAFETY: `raw` was fully initialized by the successful call above.
         Ok(Session(unsafe { raw.assume_init() }))
     }

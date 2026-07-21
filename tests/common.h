@@ -14,6 +14,6 @@ static inline tt_session_t *open_test_device(tt_session_t *sess) {
     tt_device_t dev;
     if (tt_dev_scan(1, &dev) <= 0)
         return NULL;
-    assert(tt_open(&dev, sess) == 0);
+    assert(tt_open(&dev, sess, 0) == 0);
     return sess;
 }

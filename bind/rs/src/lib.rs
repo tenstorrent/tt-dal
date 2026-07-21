@@ -52,11 +52,10 @@ pub use self::err::{Error, Result};
 #[cfg(test)]
 pub(crate) mod tests {
     pub fn open() -> crate::dev::Session {
-        crate::dev::Device::scan()
+        let dev = crate::dev::Device::scan()
             .expect("device scan failed")
             .next()
-            .expect("no device found")
-            .open()
-            .expect("device open failed")
+            .expect("no device found");
+        crate::dev::Session::open(dev).expect("device open failed")
     }
 }

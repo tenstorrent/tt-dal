@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
     // Open a session for each device
     tt_session_t sessions[MAX_DEVS];
     for (int i = 0; i < ndevs; i++) {
-        if (tt_open(&devs[i], &sessions[i]) < 0) {
+        if (tt_open(&devs[i], &sessions[i], 0) < 0) {
             fprintf(
                 stderr,
                 "%s: error: device %u: %s\n",

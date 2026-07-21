@@ -26,10 +26,8 @@ pub type Id = u32;
 /// Device descriptor.
 ///
 /// A lightweight, copyable struct describing a device. Holds no open resources.
-/// Call [`open()`] to obtain a [`Session`] handle for performing operations on
-/// the device.
-///
-/// [`open()`]: Self::open
+/// Call [`Session::open()`] to obtain a session handle for performing
+/// operations on the device.
 #[derive(Clone, Copy, Debug)]
 pub struct Device(ffi::tt_device_t);
 
@@ -169,26 +167,6 @@ impl Device {
         // Wrap each raw descriptor in the `Device` newtype
         Ok(buf.into_iter().map(Device))
     }
-
-    /// Opens the device and returns a [`Session`] handle.
-    ///
-    /// Blocks while another client holds the device exclusively (e.g.
-    /// during a reset or a flash sequence).
-    ///
-    /// # Errors
-    ///
-    /// Returns `ENODEV`, observable via [`Error::raw_os_error()`], if the
-    /// device does not exist.
-    ///
-    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
-    pub fn open(self) -> Result<Session> {
-        let mut raw = MaybeUninit::<ffi::tt_session_t>::uninit();
-        // SAFETY: `self.0` is a valid device descriptor and `raw` is a valid
-        // out-pointer for `tt_session_t`.
-        err::check(unsafe { ffi::tt_open(&raw const self.0, raw.as_mut_ptr()) })?;
-        // SAFETY: `raw` was fully initialized by the successful call above.
-        Ok(Session(unsafe { raw.assume_init() }))
-    }
 }
 
 /// Device inspection.
@@ -206,8 +184,10 @@ impl Device {
 /// Open session handle.
 ///
 /// An owned handle for performing operations on a device. Holds an open file
-/// descriptor for the duration of the session. Call [`Device::open()`] to
-/// obtain a `Session` that is closed automatically when dropped.
+/// descriptor for the duration of the session. Call [`open()`] to obtain a
+/// `Session` that is closed automatically when dropped.
+///
+/// [`open()`]: Self::open
 #[derive(Debug)]
 pub struct Session(ffi::tt_session_t);
 
@@ -240,6 +220,36 @@ impl Session {
     /// Returns a mutable raw pointer to the underlying session handle.
     pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::tt_session_t {
         &raw mut self.0
+    }
+}
+
+/// Session lifecycle.
+impl Session {
+    /// Attempts to open a session for the given device.
+    ///
+    /// Blocks while another client holds the device exclusively (e.g.
+    /// during a reset or a flash sequence). See [`OpenOptions`] for
+    /// configuring how the device is opened.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ENODEV`, observable via [`Error::raw_os_error()`], if the
+    /// device does not exist.
+    ///
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
+    pub fn open(dev: Device) -> Result<Self> {
+        Self::options().open(dev)
+    }
+
+    /// Returns a new [`OpenOptions`] object.
+    ///
+    /// Use this to open a session with specific options when [`open()`] is
+    /// not appropriate.
+    ///
+    /// [`open()`]: Self::open
+    #[must_use]
+    pub fn options() -> OpenOptions {
+        OpenOptions::new()
     }
 }
 
@@ -295,6 +305,42 @@ impl Session {
         // SAFETY: `self.0` is an open session and `info` is a valid out-pointer.
         err::check(unsafe { ffi::tt_dev_info(self.as_ptr(), &raw mut info) })?;
         Ok(info)
+    }
+}
+
+/// Options which can be used to configure how a session is opened.
+///
+/// The [`Session::options()`] method is an alias for `OpenOptions::new()`.
+/// Options are chained onto the builder, then the session is opened with
+/// [`open()`]. Like [`std::fs::OpenOptions`], the builder is `Copy` and
+/// reusable: a single configured value may open any number of sessions.
+///
+/// [`open()`]: Self::open
+#[derive(Clone, Copy, Debug, Default)]
+pub struct OpenOptions {}
+
+impl OpenOptions {
+    /// Creates a blank new set of options ready for configuration.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Opens a session for the device with the options specified by `self`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ENODEV`, observable via [`Error::raw_os_error()`], if the
+    /// device does not exist.
+    ///
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
+    pub fn open(&self, dev: Device) -> Result<Session> {
+        let mut raw = MaybeUninit::<ffi::tt_session_t>::uninit();
+        // SAFETY: `dev.0` is a valid device descriptor and `raw` is a valid
+        // out-pointer for `tt_session_t`.
+        err::check(unsafe { ffi::tt_open(&raw const dev.0, raw.as_mut_ptr(), 0) })?;
+        // SAFETY: `raw` was fully initialized by the successful call above.
+        Ok(Session(unsafe { raw.assume_init() }))
     }
 }
 

@@ -13,7 +13,7 @@ int main(void) {
 
     // Reset must be refused while another session holds the device
     tt_session_t sess;
-    assert(tt_open(&dev, &sess) == 0);
+    assert(tt_open(&dev, &sess, 0) == 0);
     assert(tt_reset(&dev) < 0);
     assert(errno == EAGAIN);
     assert(tt_close(&sess) == 0);
