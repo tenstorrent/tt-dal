@@ -346,12 +346,15 @@ no variant functions.
 
 `tt_open()` mirrors `open(2)`: one function, with behavior selected by a
 flags bitmask (`tt_open_flag_t`). `TT_OPEN_EXCL` requests the writer side of
-the kernel's open-time arbitration, and the plain open is just `flags == 0`.
+the kernel's open-time arbitration, `TT_OPEN_NONBLOCK` converts either wait
+into an immediate `EAGAIN`, and the plain open is just `flags == 0`.
 
-- Flag values are library-owned bits, mapped onto `O_EXCL` internally. The
-  platform's numeric values never enter the ABI.
+- Flag values are library-owned bits, mapped onto `O_EXCL`/`O_NONBLOCK`
+  internally. The platform's numeric values never enter the ABI.
 - Unknown bits fail with `EINVAL`, so a future flag cannot silently no-op on
   an older library.
+- There is no blocking-versus-nonblocking default to choose. Both kernel
+  behaviors are exposed one-to-one, and callers compose them.
 
 #### Power Management
 

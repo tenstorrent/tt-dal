@@ -175,7 +175,7 @@ int tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags) {
         return tt_fail(EINVAL);
 
     // Reject unknown flags
-    if (flags & ~TT_OPEN_EXCL)
+    if (flags & ~(TT_OPEN_EXCL | TT_OPEN_NONBLOCK))
         return tt_fail(EINVAL);
 
     // Build path
@@ -189,15 +189,18 @@ int tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags) {
     // `O_APPEND` signals to the kernel driver that this is a power-aware
     // client. The driver initializes power to all-off for this `fd` and
     // aggregates state across all open power-aware clients. `TT_OPEN_EXCL`
-    // passes through to the driver's open-time reader/writer arbitration.
+    // and `TT_OPEN_NONBLOCK` pass through to the driver's open-time
+    // reader/writer arbitration.
     int oflags = O_RDWR | O_CLOEXEC | O_APPEND;
     if (flags & TT_OPEN_EXCL)
         oflags |= O_EXCL;
+    if (flags & TT_OPEN_NONBLOCK)
+        oflags |= O_NONBLOCK;
 
     // Open device
     int fd = open(path, oflags);
     if (fd < 0)
-        return tt_fail(ENODEV);
+        return tt_fail(errno == EAGAIN ? EAGAIN : ENODEV);
 
     // Initialize session
     *sess = (tt_session_t){ .dev = *dev, .fd = fd };
