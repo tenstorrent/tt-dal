@@ -150,11 +150,12 @@ driver soft-failures), `ETIMEDOUT` (reset did not complete), and `ENOTSUP`
 
 One value is normalized rather than propagated: a session operation that
 fails with `ENODEV` had its descriptor invalidated by an out-of-band reset
-or removal, which reports as `ECONNRESET`. The normalization is sound
-because the caller holds proof the device existed, and it deliberately
-conflates reset with removal. Reopening distinguishes them: the open
-succeeds after a reset and reports `ENODEV` after a removal, and
-reconnecting never yields `ECONNRESET`.
+or removal, which reports as `ECONNRESET`. A telemetry read whose window is
+zapped mid-operation reports the same. The normalization is sound because
+the caller holds proof the device existed, and it deliberately conflates
+reset with removal. Reopening distinguishes them: the open succeeds after a
+reset and reports `ENODEV` after a removal, and reconnecting never yields
+`ECONNRESET`.
 
 > [!NOTE]
 >
@@ -293,6 +294,23 @@ memory.
 prioritizes **safety over performance**. Users building TLB pools can amortize
 allocation cost. Binding is expected to be infrequent relative to actual
 device access.
+
+#### Fault Recovery
+
+**TL;DR**: Library-issued window reads survive an out-of-band reset by
+reporting `ECONNRESET`. Everything else stays fail-stop.
+
+An out-of-band reset zaps every mapping belonging to the device, so a later
+access through a bound window faults. For reads the library itself performs
+(telemetry), the fault is caught and the operation reports `ECONNRESET`, so
+a monitoring loop survives a reset instead of dying mid-read. Faults the
+library does not own chain to whatever handler was installed before it and
+crash exactly as they always did.
+
+**Rejected**: Remapping zapped windows to a dummy page. Reads would return
+fabricated data and the program would keep computing on it. A crash is
+preferable to silent corruption, so recovery exists only where the library
+can abort the operation and report an error instead.
 
 #### Reset Semantics
 

@@ -2,6 +2,7 @@
 
 #include "err.h"
 #include "ioctl.h"
+#include "trap.h"
 #include "ttdal.h"
 
 #include <stdint.h>
@@ -85,6 +86,16 @@ int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table) {
     if (tt_tlb_bind(sess, &tlb, &cfg) != 0)
         goto cleanup;
 
+    // Guard the window reads.
+    //
+    // An out-of-band reset zaps the mapping, and the resulting fault
+    // resumes here instead of killing the process.
+    tt_trap_arm(tlb.ptr, TT_TLB_2MB);
+    if (sigsetjmp(tt_trap_jmp, 1)) {
+        errno = ECONNRESET;
+        goto cleanup;
+    }
+
     // Read CSM pointers
     struct {
         uint32_t tags, data;
@@ -101,6 +112,9 @@ int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table) {
         errno = EIO;
         goto cleanup;
     }
+
+    // Disarm across the rebind, which replaces the mapping
+    tt_trap_disarm();
 
     // Bind TLB to CSM
     cfg = (tt_tlb_config_t){
@@ -120,15 +134,24 @@ int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table) {
         (const volatile uint32_t *)((uint8_t *)tlb.ptr +
                                     (ptrs.data & (TT_TLB_2MB - 1)));
 
+    // Guard the snapshot reads at the window's new mapping
+    tt_trap_arm(tlb.ptr, TT_TLB_2MB);
+    if (sigsetjmp(tt_trap_jmp, 1)) {
+        errno = ECONNRESET;
+        goto cleanup;
+    }
+
     // Read telemetry snapshot
     if (snapshot(tags, data, table) != 0)
         goto cleanup;
+    tt_trap_disarm();
     tt_tlb_free(sess, &tlb);
     return TT_OK;
 
 cleanup:
     // Preserve the failure cause across the cleanup
     int err = errno;
+    tt_trap_disarm();
     tt_tlb_free(sess, &tlb);
     return tt_fail(err);
 }

@@ -130,11 +130,13 @@ impl Session {
     ///
     /// # Errors
     ///
-    /// Returns [`Unsupported`] if the device architecture is unsupported.
-    /// Returns `EIO`, observable via [`Error::raw_os_error()`], if the
-    /// telemetry data is malformed or cannot be read. Other `errno` values
-    /// propagate unchanged.
+    /// Returns [`ConnectionReset`] if the session was severed by an
+    /// out-of-band device reset or removal, or [`Unsupported`] if the device
+    /// architecture is unsupported. Returns `EIO`, observable via
+    /// [`Error::raw_os_error()`], if the telemetry data is malformed or
+    /// cannot be read. Other `errno` values propagate unchanged.
     ///
+    /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
     /// [`Unsupported`]: std::io::ErrorKind::Unsupported
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn telemetry(&self) -> Result<Telemetry> {
