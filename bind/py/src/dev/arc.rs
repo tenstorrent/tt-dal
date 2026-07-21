@@ -88,12 +88,14 @@ impl Session {
     /// ARC messaging is otherwise not yet implemented, so the underlying
     /// call aborts before returning.
     #[pyo3(signature = (msg, wait=true, timeout=None))]
-    pub fn message(&self, msg: Message, wait: bool, timeout: Option<u32>) -> PyResult<Message> {
-        let mut raw = msg.0;
-        // SAFETY: Self is an open device and raw is a valid tt_message_t.
-        crate::err::check(unsafe {
-            ffi::tt_message(Session::as_ptr(self), &mut raw, wait, timeout.unwrap_or(0))
-        })?;
-        Ok(Message(raw))
+    pub fn message(&mut self, msg: Message, wait: bool, timeout: Option<u32>) -> PyResult<Message> {
+        self.call(|sess| {
+            let mut raw = msg.0;
+            // SAFETY: `sess` is an open device and raw is a valid tt_message_t.
+            crate::err::check(unsafe {
+                ffi::tt_message(sess, &mut raw, wait, timeout.unwrap_or(0))
+            })?;
+            Ok(Message(raw))
+        })
     }
 }

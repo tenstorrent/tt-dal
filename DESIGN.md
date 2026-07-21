@@ -156,6 +156,17 @@ conflates reset with removal. Reopening distinguishes them: the open
 succeeds after a reset and reports `ENODEV` after a removal, and
 reconnecting never yields `ECONNRESET`.
 
+> [!NOTE]
+>
+> The language bindings layer policy above this mechanism: a session opened
+> as persistent transparently reopens and retries the failing operation
+> when it reports `ECONNRESET`, up to a small bounded number of attempts.
+> The reopen never yields `ECONNRESET` itself. It either succeeds, making
+> the reset invisible, or it fails exactly as `tt_open()` fails, with
+> `ENODEV` for a dead device. A connection that keeps resetting past the
+> bound also reports `ENODEV`, so persistent callers never see
+> `ECONNRESET`. The C API never reopens on its own.
+
 Per the libc convention, `errno` is meaningful only after a `-1` return. A
 successful call may leave unrelated residue there, so callers must check the
 return value before inspecting `errno`.

@@ -29,10 +29,10 @@ impl Session {
     /// Other `errno` values propagate from the failing system call. The
     /// session is closed even on error.
     pub fn reset(&mut self) -> PyResult<Device> {
-        // SAFETY: `self.0` is a valid session handle. tt_reset_with consumes
+        // SAFETY: `self.raw` is a valid session handle. tt_reset_with consumes
         // it (setting fd to -1) on all paths, so no double-close can occur.
-        crate::err::check(unsafe { ffi::tt_reset_with(&mut self.0) })?;
-        Ok(Device(self.0.dev))
+        crate::err::check(unsafe { ffi::tt_reset_with(self.as_mut_ptr()) })?;
+        Ok(self.dev())
     }
 }
 
