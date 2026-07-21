@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <ttdal.h>
 
@@ -14,6 +15,6 @@ int main(void) {
     // Wake up the GDDR PHY
     int rc = tt_power(sess, TT_POWER_MRISC_PHY_WAKEUP);
     if (rc < 0)
-        printf("mrisc_phy_wakeup failed: tt_errno=%d\n", tt_errno);
+        printf("mrisc_phy_wakeup failed: errno=%d\n", errno);
     tt_close(sess);
 }

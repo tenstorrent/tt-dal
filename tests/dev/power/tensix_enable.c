@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <ttdal.h>
 
@@ -14,6 +15,6 @@ int main(void) {
     // Enable Tensix cores
     int rc = tt_power(sess, TT_POWER_TENSIX_ENABLE);
     if (rc < 0)
-        printf("tensix_enable failed: tt_errno=%d\n", tt_errno);
+        printf("tensix_enable failed: errno=%d\n", errno);
     tt_close(sess);
 }

@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
 
+#include "err.h"
 #include "ioctl.h"
 #include "ttdal.h"
 
@@ -14,11 +15,11 @@ int tt_message(
 ) {
     // Validate args
     if (!sess || !msg)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Ensure session is open
     if (sess->fd < 0)
-        return tt_errno = TT_ENOTOPEN, TT_ERR;
+        return tt_fail(ENOTCONN);
 
     abort(); // unimplemented
 }

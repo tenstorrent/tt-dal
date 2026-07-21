@@ -39,9 +39,18 @@ impl Session {
     ///
     /// # Errors
     ///
-    /// Returns an error if the kernel driver rejects the reset request, or
-    /// with `TT_EBUSY` if another client opened the device before exclusive
-    /// access could be acquired. The session is consumed even on error.
+    /// Returns [`WouldBlock`] if another client opened the device before
+    /// exclusive access could be acquired, [`ConnectionReset`] if the device
+    /// was reset or removed out-of-band, or [`TimedOut`] if the reset did not
+    /// complete in time. Returns `ENODEV` if the device is absent, `EIO` if
+    /// the reset sequence failed, or `ENOTCONN` if the session is already
+    /// closed, all observable via [`Error::raw_os_error()`]. Other `errno`
+    /// values propagate unchanged. The session is consumed even on error.
+    ///
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
+    /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
+    /// [`TimedOut`]: std::io::ErrorKind::TimedOut
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn reset(self) -> Result<Device> {
         let mut this = std::mem::ManuallyDrop::new(self);
         // SAFETY: `ManuallyDrop` prevents `Drop` from running, and
@@ -60,9 +69,17 @@ impl Device {
     ///
     /// # Errors
     ///
-    /// Returns an error if the kernel driver rejects the reset request, or
-    /// with `TT_EBUSY` if any client (including this process) has the
-    /// device open.
+    /// Returns [`WouldBlock`] if any client (including this process) has the
+    /// device open, [`ConnectionReset`] if the device was reset or removed
+    /// out-of-band, or [`TimedOut`] if the reset did not complete in time.
+    /// Returns `ENODEV` if the device is absent or `EIO` if the reset
+    /// sequence failed, both observable via [`Error::raw_os_error()`]. Other
+    /// `errno` values propagate unchanged.
+    ///
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
+    /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
+    /// [`TimedOut`]: std::io::ErrorKind::TimedOut
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn reset(&self) -> Result<()> {
         // SAFETY: `self.0` is a valid device descriptor.
         err::check(unsafe { ffi::tt_reset(self.as_ptr()) })

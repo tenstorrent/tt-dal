@@ -2,6 +2,7 @@
 
 // Example: Reset one or more Tenstorrent devices
 
+#include <errno.h>
 #include <libgen.h>
 #include <stdio.h>
 #include <string.h>
@@ -30,7 +31,7 @@ static void close_or_warn(const char *prog, tt_session_t *sess) {
             "%s: error: device %u: close failed: %s\n",
             prog,
             sess->dev.id,
-            tt_error_describe(tt_errno)
+            strerror(errno)
         );
 }
 
@@ -78,11 +79,7 @@ int main(int argc, char *argv[]) {
         }
         if (device_from_spec(argv[i], &devs[ndevs]) < 0) {
             fprintf(
-                stderr,
-                "%s: error: %s: %s\n",
-                prog,
-                argv[i],
-                tt_error_describe(tt_errno)
+                stderr, "%s: error: %s: %s\n", prog, argv[i], strerror(errno)
             );
             return 1;
         }
@@ -92,7 +89,7 @@ int main(int argc, char *argv[]) {
     // Reset each device.
     //
     // `tt_reset()` acquires exclusive access internally, so a reset is
-    // refused (`TT_EBUSY`) while any other client holds the device. It
+    // refused (`EAGAIN`) while any other client holds the device. It
     // issues the ASIC reset, waits for completion, and issues the
     // post-reset `ioctl` before returning.
     int failed = 0;
@@ -105,7 +102,7 @@ int main(int argc, char *argv[]) {
                 "%s: error: device %u: %s\n",
                 prog,
                 devs[i].id,
-                tt_error_describe(tt_errno)
+                strerror(errno)
             );
             failed = 1;
             continue;
@@ -119,7 +116,7 @@ int main(int argc, char *argv[]) {
                 "%s: error: device %u: post-reset open failed: %s\n",
                 prog,
                 devs[i].id,
-                tt_error_describe(tt_errno)
+                strerror(errno)
             );
             failed = 1;
             continue;
@@ -131,7 +128,7 @@ int main(int argc, char *argv[]) {
                 "%s: error: device %u: post-reset verify failed: %s\n",
                 prog,
                 devs[i].id,
-                tt_error_describe(tt_errno)
+                strerror(errno)
             );
             close_or_warn(prog, &sess);
             failed = 1;

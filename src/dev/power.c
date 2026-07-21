@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
 
+#include "err.h"
 #include "ioctl.h"
 #include "ttdal.h"
 
+#include <errno.h>
 #include <sys/ioctl.h>
 
 /// Set device power state.
@@ -12,11 +14,11 @@
 int tt_power(const tt_session_t *sess, uint16_t flags) {
     // Validate args
     if (!sess)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Ensure open
     if (sess->fd < 0)
-        return tt_errno = TT_ENOTOPEN, TT_ERR;
+        return tt_fail(ENOTCONN);
 
     // Build `ioctl` struct.
     //
@@ -32,7 +34,7 @@ int tt_power(const tt_session_t *sess, uint16_t flags) {
 
     // Issue `ioctl`
     if (ioctl(sess->fd, TENSTORRENT_IOCTL_SET_POWER_STATE, &power) != 0)
-        return tt_errno = TT_EIO, TT_ERR;
+        return tt_fail_io(errno);
 
     return TT_OK;
 }

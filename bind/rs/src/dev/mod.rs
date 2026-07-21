@@ -8,6 +8,7 @@ pub mod telem;
 pub mod tlb;
 
 use std::ffi::CString;
+use std::io;
 use std::mem::MaybeUninit;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -67,9 +68,19 @@ impl TryFrom<&Path> for Device {
     type Error = Error;
 
     /// Constructs a device descriptor from the given `/dev/tenstorrent/` path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidInput`] if `path` contains an interior nul byte or
+    /// does not name a `/dev/tenstorrent/` device node. Returns `ENODEV`,
+    /// observable via [`Error::raw_os_error()`], if the path does not
+    /// resolve to a device.
+    ///
+    /// [`InvalidInput`]: std::io::ErrorKind::InvalidInput
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     fn try_from(path: &Path) -> Result<Self> {
         let path = CString::new(path.as_os_str().as_bytes())
-            .map_err(|_| Error::from_raw_error(ffi::TT_EINVAL))?;
+            .map_err(|_| Error(io::ErrorKind::InvalidInput.into()))?;
         let mut raw = MaybeUninit::<ffi::tt_device_t>::uninit();
 
         // SAFETY: `path` is a valid null-terminated C string and `raw` is a
@@ -85,9 +96,16 @@ impl TryFrom<pci::Address> for Device {
     type Error = Error;
 
     /// Constructs a device descriptor for the device at the given PCI address.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ENODEV`, observable via [`Error::raw_os_error()`], if no
+    /// connected device matches the address.
+    ///
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     fn try_from(addr: pci::Address) -> Result<Self> {
-        let bdf =
-            CString::new(addr.to_string()).map_err(|_| Error::from_raw_error(ffi::TT_EINVAL))?;
+        let bdf = CString::new(addr.to_string())
+            .map_err(|_| Error(io::ErrorKind::InvalidInput.into()))?;
         let mut raw = MaybeUninit::<ffi::tt_device_t>::uninit();
 
         // SAFETY: `bdf` is a valid null-terminated C string and `raw` is a
@@ -103,9 +121,15 @@ impl TryFrom<pci::Address> for Device {
 impl Device {
     /// Discovers all connected Tenstorrent devices.
     ///
+    /// A missing device directory means the driver is not loaded, so it
+    /// scans as zero devices rather than failing.
+    ///
     /// # Errors
     ///
-    /// Returns an error if the kernel driver scan fails.
+    /// Returns any `errno` left by the failing directory scan, observable
+    /// via [`Error::raw_os_error()`].
+    ///
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     #[doc(alias = "discover")]
     pub fn scan() -> Result<impl Iterator<Item = Self>> {
         // Grow-and-retry until all devices fit.
@@ -153,7 +177,10 @@ impl Device {
     ///
     /// # Errors
     ///
-    /// Returns an error if the kernel driver fails to open the device.
+    /// Returns `ENODEV`, observable via [`Error::raw_os_error()`], if the
+    /// device does not exist.
+    ///
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn open(self) -> Result<Session> {
         let mut raw = MaybeUninit::<ffi::tt_session_t>::uninit();
         // SAFETY: `self.0` is a valid device descriptor and `raw` is a valid
@@ -223,7 +250,10 @@ impl Session {
     ///
     /// # Errors
     ///
-    /// Returns an error if the kernel driver fails to close the device.
+    /// Returns any `errno` left by the failing `close(2)`, observable via
+    /// [`Error::raw_os_error()`].
+    ///
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn close(self) -> Result<()> {
         let mut this = std::mem::ManuallyDrop::new(self);
         // SAFETY: `ManuallyDrop` prevents `Drop` from running, so
@@ -249,7 +279,13 @@ impl Session {
     ///
     /// # Errors
     ///
-    /// Returns an error if the kernel driver fails to retrieve device info.
+    /// Returns [`ConnectionReset`] if the session was severed by an
+    /// out-of-band device reset or removal. Any other `errno` from the
+    /// failing `ioctl` propagates unchanged, observable via
+    /// [`Error::raw_os_error()`].
+    ///
+    /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     #[expect(clippy::missing_panics_doc)]
     pub fn info(&self) -> Result<Info> {
         // SAFETY: `Info` is a C struct, so zero-initializing it is valid.

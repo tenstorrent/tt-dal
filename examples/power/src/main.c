@@ -2,6 +2,7 @@
 
 // Example: Interactive power state control for a Tenstorrent device
 
+#include <errno.h>
 #include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,7 +59,7 @@ static void close_or_warn(const char *prog, tt_session_t *sess) {
             "%s: error: device %u: close failed: %s\n",
             prog,
             sess->dev.id,
-            tt_error_describe(tt_errno)
+            strerror(errno)
         );
 }
 
@@ -106,11 +107,7 @@ int main(int argc, char *argv[]) {
         }
         if (device_from_spec(argv[i], &devs[ndevs]) < 0) {
             fprintf(
-                stderr,
-                "%s: error: %s: %s\n",
-                prog,
-                argv[i],
-                tt_error_describe(tt_errno)
+                stderr, "%s: error: %s: %s\n", prog, argv[i], strerror(errno)
             );
             return 1;
         }
@@ -126,7 +123,7 @@ int main(int argc, char *argv[]) {
                 "%s: error: device %u: %s\n",
                 prog,
                 devs[i].id,
-                tt_error_describe(tt_errno)
+                strerror(errno)
             );
             for (int j = 0; j < i; j++)
                 close_or_warn(prog, &sessions[j]);
@@ -204,7 +201,7 @@ int main(int argc, char *argv[]) {
                     "%s: error: device %u: %s\n",
                     prog,
                     devs[i].id,
-                    tt_error_describe(tt_errno)
+                    strerror(errno)
                 );
                 ok = 0;
             }

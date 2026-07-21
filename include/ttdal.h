@@ -73,7 +73,15 @@ static inline tt_version_t tt_version_dal(void) {
 /// it, and closes it before returning.
 ///
 /// @param[out] version  KMD version output.
-/// @return              0 on success, -1 on error (check `tt_errno`).
+/// @return              0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `version` is `NULL`.
+/// * `ENODEV`     No device is available.
+/// * `ECONNRESET` The device was reset or removed out-of-band.
+///
+/// Other codes propagate from the failing system call.
 int tt_version_driver(tt_version_t *version);
 
 /// Get the device firmware version.
@@ -83,7 +91,15 @@ int tt_version_driver(tt_version_t *version);
 ///
 /// @param sess          Session handle.
 /// @param[out] version  Firmware version output.
-/// @return              0 on success, -1 on error (check `tt_errno`).
+/// @return              0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `sess` or `version` is `NULL`.
+/// * `ENOTCONN`   The session is not open.
+/// * `EIO`        The version string was empty or malformed.
+///
+/// Other codes propagate from the failing system call.
 int tt_version_firmware(const tt_session_t *sess, tt_version_t *version);
 
 /*============================================================================*
@@ -96,131 +112,30 @@ int tt_version_firmware(const tt_session_t *sess, tt_version_t *version);
 /// Return value indicating failure.
 #define TT_ERR (-1)
 
-/// Error codes.
-///
-/// Functions return -1 on error and set the thread-local `tt_errno` to the
-/// corresponding error code. On success, functions return 0 or a meaningful
-/// non-negative value where applicable.
-///
-/// Error codes are positive integers organized according to the following
-/// categories:
-///
-/// * 100-199: General
-/// * 200-299: Device
-/// * 300-399: Transport
-/// * 400-499: Hardware
-///
-/// @par Example
-///
-/// ```c
-/// return tt_errno = TT_ENODEV, TT_ERR;
-/// ```
-/// This returns `TT_ERR` (-1) to the caller while setting `tt_errno` to
-/// `TT_ENODEV` (200).
-typedef enum tt_error {
-    /* General errors (100-199) */
-    /// Invalid argument.
-    TT_EINVAL  = 100,
-    /// Out of memory.
-    TT_ENOMEM  = 101,
-    /// Operation not supported.
-    TT_ENOTSUP = 102,
-    /// No buffer space available.
-    TT_ENOBUFS = 103,
-    /// Alignment error.
-    TT_EALIGN  = 104,
-    /// I/O error.
-    TT_EIO     = 105,
-
-    /* Device errors (200-299) */
-    /// No such device.
-    TT_ENODEV   = 200,
-    /// Device or resource busy.
-    TT_EBUSY    = 201,
-    /// Device not open.
-    TT_ENOTOPEN = 202,
-    /// Device lost.
-    TT_EDEVLOST = 203,
-    /// Device hung.
-    TT_EDEVHUNG = 204,
-    /// Unsupported architecture.
-    TT_EBADARCH = 205,
-    /// Permission denied.
-    TT_EACCES   = 206,
-
-    /* Transport errors (300-399) */
-    /// Operation timed out.
-    TT_ETIMEDOUT = 300,
-    /// ARC message failed.
-    TT_EARCMSG   = 301,
-
-    /* Hardware state errors (400-499) */
-    /// Device not ready.
-    TT_ENOTREADY = 400,
-} tt_error_t;
-
-/// Thread-local error descriptor.
-///
-/// Set when an operation fails. Check this for detailed error information when
-/// a function returns an error. Similar to the C standard library's `errno`.
-///
-/// This is thread-local storage.
-extern _Thread_local tt_error_t tt_errno;
-
-/// Returns the current thread's error code.
-///
-/// Wraps the thread-local `tt_errno` for use from languages that cannot
-/// access `_Thread_local` variables directly.
-///
-/// @return  Current value of `tt_errno`.
-static inline tt_error_t tt_get_errno(void) { return tt_errno; }
-
-/// Get a human-readable error message.
-///
-/// @param error  Error variant.
-/// @return       Error string; `NULL` if `TT_OK`.
-static inline const char *tt_error_describe(tt_error_t error) {
-    // Not an error
-    if (!error)
-        return NULL;
-    // Describe error
-    switch (error) {
-        case TT_EINVAL:
-            return "invalid argument";
-        case TT_ENOMEM:
-            return "out of memory";
-        case TT_ENOTSUP:
-            return "operation not supported";
-        case TT_ENOBUFS:
-            return "no buffer space available";
-        case TT_EALIGN:
-            return "alignment error";
-        case TT_EIO:
-            return "I/O error";
-        case TT_ENODEV:
-            return "no such device";
-        case TT_EBUSY:
-            return "device or resource busy";
-        case TT_ENOTOPEN:
-            return "device not open";
-        case TT_EDEVLOST:
-            return "device lost";
-        case TT_EDEVHUNG:
-            return "device hung";
-        case TT_EBADARCH:
-            return "unsupported architecture";
-        case TT_EACCES:
-            return "permission denied";
-        case TT_ETIMEDOUT:
-            return "operation timed out";
-        case TT_EARCMSG:
-            return "ARC message failed";
-        case TT_ENOTREADY:
-            return "device not ready";
-        default:
-            return "unknown error";
-    }
-}
+/*
+ * Functions return -1 on error and leave the cause in `errno`, following
+ * the libc convention. Stringify with `strerror()` or report with
+ * `perror()`. The value in `errno` is meaningful only after a -1 return,
+ * as a successful call may leave unrelated residue there.
+ *
+ * Errors from the OS propagate untouched unless a standard value names
+ * the failure more precisely, in which case the library reports that
+ * value instead:
+ *
+ * * `EINVAL`     Invalid argument.
+ * * `ENOTCONN`   Session is not open.
+ * * `ENODEV`     No such device (normalized from device lookups).
+ * * `EAGAIN`     Device held by another client (non-blocking open).
+ * * `ECONNRESET` Device connection reset. The session was severed by an
+ *                out-of-band reset or removal (normalized from `ENODEV`
+ *                on session operations). Reopen to continue: the open
+ *                succeeds after a reset and reports `ENODEV` after a
+ *                removal.
+ * * `EIO`        Device I/O failed (also raised for driver
+ *                soft-failures).
+ * * `ETIMEDOUT`  Reset did not complete in time.
+ * * `ENOTSUP`    Operation not supported on this device architecture.
+ */
 
 /*============================================================================*
  * DEVICE                                                                     *
@@ -315,7 +230,12 @@ typedef struct tt_session {
 ///
 /// @param path      Device path.
 /// @param[out] dev  Device descriptor to initialize.
-/// @return          0 on success, -1 on error (check `tt_errno`).
+/// @return          0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `path` or `dev` is `NULL`, or `path` is not a device node.
+/// * `ENODEV`     The path does not resolve to a device.
 ///
 /// @par Example
 ///
@@ -342,7 +262,12 @@ int tt_dev_from_path(const char *path, tt_device_t *dev);
 ///
 /// @param addr      PCIe BDF string (e.g. "0000:03:00.0" or "03:00.0").
 /// @param[out] dev  Device descriptor to initialize.
-/// @return          0 on success, -1 on error (check `tt_errno`).
+/// @return          0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `addr` or `dev` is `NULL`, or `addr` is malformed.
+/// * `ENODEV`     No device matches the address.
 ///
 /// @par Example
 ///
@@ -361,7 +286,9 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev);
 /// Discover connected devices.
 ///
 /// Scans for connected devices. Fills buffer with up to `cap` descriptors.
-/// Return value may exceed `cap` if more devices were found.
+/// Return value may exceed `cap` if more devices were found. A missing
+/// device directory means the driver is not loaded, so it scans as zero
+/// devices rather than failing.
 ///
 /// Must call `tt_open()` to obtain a session before using a device obtained
 /// this way.
@@ -370,6 +297,10 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev);
 /// @param[out] buf  Buffer for found devices.
 /// @return          Number of devices found (may exceed `cap`), negative on
 ///                  error.
+///
+/// @par Errors
+///
+/// Codes propagate from the failing system call.
 ///
 /// @par Example
 ///
@@ -398,7 +329,12 @@ ssize_t tt_dev_scan(size_t cap, tt_device_t buf[static cap]);
 ///
 /// @param dev       Device descriptor.
 /// @param[out] sess Session handle to initialize.
-/// @return          0 on success, -1 on error (check `tt_errno`).
+/// @return          0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `dev` or `sess` is `NULL`.
+/// * `ENODEV`     The device could not be opened.
 int tt_open(const tt_device_t *dev, tt_session_t *sess);
 
 /// Close a session handle.
@@ -408,7 +344,13 @@ int tt_open(const tt_device_t *dev, tt_session_t *sess);
 /// no-op.
 ///
 /// @param sess  Session handle.
-/// @return      0 on success, -1 on error (check `tt_errno`).
+/// @return      0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `sess` is `NULL`.
+///
+/// Other codes propagate from the failing system call.
 int tt_close(tt_session_t *sess);
 
 /// Device information.
@@ -440,7 +382,15 @@ typedef struct tt_dev_info {
 ///
 /// @param sess      Session handle.
 /// @param[out] info Device information output.
-/// @return          0 on success, -1 on error (check `tt_errno`).
+/// @return          0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `sess` or `info` is `NULL`.
+/// * `ENOTCONN`   The session is not open.
+/// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
+///
+/// Other codes propagate from the failing system call.
 int tt_dev_info(const tt_session_t *sess, tt_dev_info_t *info);
 
 /*============================================================================*
@@ -541,13 +491,21 @@ typedef struct tt_tlb_config {
 /// have a pointer (`NULL`) and must be bound with `tt_tlb_bind()` before use.
 ///
 /// On an invalid `mode`, the freshly allocated TLB is freed before the call
-/// returns `TT_EINVAL`.
+/// returns `EINVAL`.
 ///
 /// @param sess     Session handle.
 /// @param size     Window size.
 /// @param mode     Cache mode.
 /// @param[out] tlb Allocated TLB handle with `ptr = NULL`.
-/// @return         0 on success, -1 on error (check `tt_errno`).
+/// @return         0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `sess` or `tlb` is `NULL`, or `mode` is invalid.
+/// * `ENOTCONN`   The session is not open.
+/// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
+///
+/// Other codes propagate from the failing system call.
 int tt_tlb_alloc(
     const tt_session_t *sess,
     tt_tlb_size_t size,
@@ -571,7 +529,15 @@ int tt_tlb_alloc(
 /// @param sess  Session handle.
 /// @param tlb   TLB handle.
 /// @param cfg   NOC configuration.
-/// @return      0 on success, -1 on error (check `tt_errno`).
+/// @return      0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `sess`, `tlb`, or `cfg` is `NULL`.
+/// * `ENOTCONN`   The session is not open.
+/// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
+///
+/// Other codes propagate from the failing system call.
 int tt_tlb_bind(
     const tt_session_t *sess, tt_tlb_t *tlb, const tt_tlb_config_t *cfg
 );
@@ -584,7 +550,15 @@ int tt_tlb_bind(
 ///
 /// @param sess  Session handle.
 /// @param tlb   TLB handle.
-/// @return      0 on success, -1 on error (check `tt_errno`).
+/// @return      0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `sess` or `tlb` is `NULL`.
+/// * `ENOTCONN`   The session is not open.
+/// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
+///
+/// Other codes propagate from the failing system call.
 int tt_tlb_free(const tt_session_t *sess, tt_tlb_t *tlb);
 
 /*============================================================================*
@@ -610,7 +584,12 @@ typedef struct tt_message {
 /// @param[in,out] msg    ARC message body.
 /// @param wait           Wait for completion.
 /// @param timeout        Timeout in milliseconds (`0` for default 1000ms).
-/// @return               0 on success, -1 on error (check `tt_errno`).
+/// @return               0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `sess` or `msg` is `NULL`.
+/// * `ENOTCONN`   The session is not open.
 int tt_message(
     const tt_session_t *sess, tt_message_t *msg, bool wait, uint32_t timeout
 );
@@ -796,7 +775,16 @@ typedef uint32_t tt_telemetry_t[TT_TELEMETRY_LEN];
 ///
 /// @param sess         Session handle.
 /// @param[out] table   Telemetry data output.
-/// @return             0 on success, -1 on error (check `tt_errno`).
+/// @return             0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `sess` or `table` is `NULL`.
+/// * `ENOTCONN`   The session is not open.
+/// * `EIO`        Telemetry data was malformed or could not be read.
+/// * `ENOTSUP`    The device architecture is unsupported.
+///
+/// Other codes propagate from the failing system call.
 int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table);
 
 /*============================================================================*
@@ -857,7 +845,15 @@ typedef enum tt_power_flag {
 ///
 /// @param sess   Session handle.
 /// @param flags  Bitmask of `tt_power_flag_t` values to enable.
-/// @return       0 on success, -1 on error (check `tt_errno`).
+/// @return       0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `sess` is `NULL`.
+/// * `ENOTCONN`   The session is not open.
+/// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
+///
+/// Other codes propagate from the failing system call.
 int tt_power(const tt_session_t *sess, uint16_t flags);
 
 /*============================================================================*
@@ -874,7 +870,7 @@ int tt_power(const tt_session_t *sess, uint16_t flags);
 ///
 /// Acquisition succeeds only when no other client has the device open,
 /// including descriptors held by the calling process. If the device is
-/// busy, the reset fails with `TT_EBUSY` rather than resetting under other
+/// busy, the reset fails with `EAGAIN` rather than resetting under other
 /// clients or blocking indefinitely. A reset never destroys another
 /// client's session out from under it. To reset a device the caller has
 /// open, use `tt_reset_with()`.
@@ -885,7 +881,18 @@ int tt_power(const tt_session_t *sess, uint16_t flags);
 /// at open time. The requirement is not checked at runtime.
 ///
 /// @param dev   Device descriptor.
-/// @return      0 on success, -1 on error (check `tt_errno`).
+/// @return      0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `dev` is `NULL`.
+/// * `ENODEV`     The device does not exist.
+/// * `EAGAIN`     Another client holds the device open.
+/// * `ECONNRESET` The device was reset or removed out-of-band.
+/// * `EIO`        The reset sequence failed.
+/// * `ETIMEDOUT`  The reset did not complete in time.
+///
+/// Other codes propagate from the failing system call.
 int tt_reset(const tt_device_t *dev);
 
 /// Trigger device reset via an open session.
@@ -897,10 +904,22 @@ int tt_reset(const tt_device_t *dev);
 ///
 /// Exclusive acquisition requires the device to be idle, so the session is
 /// closed before the reset begins. Another client may open the device in
-/// that window, in which case the reset fails with `TT_EBUSY`.
+/// that window, in which case the reset fails with `EAGAIN`.
 ///
 /// @param sess  Session handle (consumed).
-/// @return      0 on success, -1 on error (check `tt_errno`).
+/// @return      0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `sess` is `NULL`.
+/// * `ENOTCONN`   The session is not open.
+/// * `ENODEV`     The device does not exist.
+/// * `EAGAIN`     Another client holds the device open.
+/// * `ECONNRESET` The device was reset or removed out-of-band.
+/// * `EIO`        The reset sequence failed.
+/// * `ETIMEDOUT`  The reset did not complete in time.
+///
+/// Other codes propagate from the failing system call.
 ///
 /// @par Example
 ///

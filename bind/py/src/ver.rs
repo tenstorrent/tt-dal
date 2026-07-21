@@ -56,7 +56,12 @@ pub fn library(py: Python<'_>) -> PyResult<Py<PyAny>> {
 ///
 /// Discovers and briefly opens an available device to issue the query.
 ///
-/// Returns an error if the kernel driver version query fails.
+/// Raises `TTError` with:
+///
+/// - `ENODEV` if no device is available.
+/// - `ECONNRESET` if the device was reset or removed while querying.
+///
+/// Other `errno` values propagate from the failing system call.
 #[pyfunction]
 pub fn driver(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let mut raw = std::mem::MaybeUninit::<ffi::tt_version_t>::uninit();
@@ -68,7 +73,12 @@ pub fn driver(py: Python<'_>) -> PyResult<Py<PyAny>> {
 
 /// Returns firmware bundle version.
 ///
-/// Returns an error if the firmware version query fails.
+/// Raises `TTError` with:
+///
+/// - `ENOTCONN` if the session has been closed.
+/// - `EIO` if the firmware version string is empty or malformed.
+///
+/// Other `errno` values propagate from the failing system call.
 #[pyfunction]
 pub fn firmware(sess: &crate::dev::Session, py: Python<'_>) -> PyResult<Py<PyAny>> {
     let mut raw = std::mem::MaybeUninit::<ffi::tt_version_t>::uninit();

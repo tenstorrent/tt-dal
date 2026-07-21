@@ -110,7 +110,13 @@ impl<'dev> Tlb<'dev> {
     ///
     /// # Errors
     ///
-    /// Returns an error if the kernel driver rejects the configuration.
+    /// Returns [`ConnectionReset`] if the session was severed by an
+    /// out-of-band device reset or removal. Other `errno` values from the
+    /// failing `mmap` or `ioctl` propagate unchanged, observable via
+    /// [`Error::raw_os_error()`].
+    ///
+    /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     #[doc(alias = "configure")]
     pub fn bind<'tlb>(&'tlb mut self, cfg: &Config) -> Result<Window<'tlb, 'dev>> {
         // SAFETY: `self.dev.0` is an open device, `self.raw` is a TLB allocated
@@ -125,7 +131,13 @@ impl<'dev> Tlb<'dev> {
     ///
     /// # Errors
     ///
-    /// Returns an error if the kernel driver fails to free the TLB.
+    /// Returns [`ConnectionReset`] if the session was severed by an
+    /// out-of-band device reset or removal. Other `errno` values from the
+    /// failing `munmap` or `ioctl` propagate unchanged, observable via
+    /// [`Error::raw_os_error()`].
+    ///
+    /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn free(self) -> Result<()> {
         let mut this = std::mem::ManuallyDrop::new(self);
         // SAFETY: `ManuallyDrop` prevents `Drop` from running, so `tt_tlb_free`
@@ -189,7 +201,13 @@ impl Session {
     ///
     /// # Errors
     ///
-    /// Returns an error if the kernel driver fails to allocate the window.
+    /// Returns [`ConnectionReset`] if the session was severed by an
+    /// out-of-band device reset or removal. Other `errno` values from the
+    /// failing `ioctl` propagate unchanged, observable via
+    /// [`Error::raw_os_error()`].
+    ///
+    /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn alloc(&self, size: Size, mode: Caching) -> Result<Tlb<'_>> {
         let mut raw = std::mem::MaybeUninit::<ffi::tt_tlb_t>::uninit();
         // SAFETY: `self.0` is an open device and `raw` is a valid out-pointer

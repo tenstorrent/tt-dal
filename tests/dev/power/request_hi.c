@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <ttdal.h>
 
@@ -14,6 +15,6 @@ int main(void) {
     // Request all power features simultaneously
     int rc = tt_power(sess, 0xFFFF);
     if (rc < 0)
-        printf("request_hi failed: tt_errno=%d\n", tt_errno);
+        printf("request_hi failed: errno=%d\n", errno);
     tt_close(sess);
 }

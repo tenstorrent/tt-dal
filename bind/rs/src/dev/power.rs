@@ -10,7 +10,7 @@
 //!
 //! # Usage
 //!
-//! Request the power state with [`Session::request_power()`] to enable the
+//! Request the power state with [`Session::power()`] to enable the
 //! desired features for this session.
 //!
 //! ```no_run
@@ -22,9 +22,9 @@
 //! let con = dev.open()?;
 //!
 //! // Request a preset high-power state
-//! con.request_power(FlagSet::HI)?;
+//! con.power(FlagSet::HI)?;
 //! // Or request individual flags
-//! con.request_power([Flag::MaxAiClk, Flag::TensixEnable])?;
+//! con.power([Flag::MaxAiClk, Flag::TensixEnable])?;
 //! #
 //! # Ok::<(), ttdal::Error>(())
 //! ```
@@ -36,7 +36,7 @@ use crate::{Result, err};
 /// Power feature flag.
 ///
 /// A single controllable power feature on the device. Combine flags into a
-/// [`FlagSet`] and pass to [`Session::request_power()`] to request the desired
+/// [`FlagSet`] and pass to [`Session::power()`] to request the desired
 /// power state.
 #[repr(u16)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -113,8 +113,14 @@ impl Session {
     ///
     /// # Errors
     ///
-    /// Returns an error if the kernel driver rejects the request.
-    pub fn request_power(&self, flags: impl Into<FlagSet>) -> Result<()> {
+    /// Returns [`ConnectionReset`] if the session was severed by an
+    /// out-of-band device reset or removal. Other `errno` values from the
+    /// failing `ioctl` propagate unchanged, observable via
+    /// [`Error::raw_os_error()`].
+    ///
+    /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
+    pub fn power(&self, flags: impl Into<FlagSet>) -> Result<()> {
         let raw = flags.into().0;
         // SAFETY: `self.0` is an open device and `raw` is a valid bitmask.
         err::check(unsafe { ffi::tt_power(self.as_ptr(), raw) })
@@ -164,18 +170,18 @@ mod tests {
     #[test]
     #[ignore]
     #[serial]
-    fn request_power_hi() {
+    fn power_hi() {
         crate::tests::open()
-            .request_power(FlagSet::HI)
-            .expect("request_power HI failed");
+            .power(FlagSet::HI)
+            .expect("power HI failed");
     }
 
     #[test]
     #[ignore]
     #[serial]
-    fn request_power_lo() {
+    fn power_lo() {
         crate::tests::open()
-            .request_power(FlagSet::LO)
-            .expect("request_power LO failed");
+            .power(FlagSet::LO)
+            .expect("power LO failed");
     }
 }

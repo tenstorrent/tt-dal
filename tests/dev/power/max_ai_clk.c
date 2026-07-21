@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <ttdal.h>
 
@@ -14,6 +15,6 @@ int main(void) {
     // Request maximum AI clock frequency
     int rc = tt_power(sess, TT_POWER_MAX_AI_CLK);
     if (rc < 0)
-        printf("max_ai_clk failed: tt_errno=%d\n", tt_errno);
+        printf("max_ai_clk failed: errno=%d\n", errno);
     tt_close(sess);
 }

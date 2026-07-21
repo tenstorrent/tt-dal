@@ -48,8 +48,8 @@ impl Session {
     ///
     /// # Errors
     ///
-    /// Returns an error if the ARC message fails or the controller reports an
-    /// error code.
+    /// ARC messaging is not yet implemented, so the underlying call aborts
+    /// before returning.
     pub fn message(&self, msg: Message, wait: bool, timeout: Option<Duration>) -> Result<Message> {
         let timeout = timeout.map_or(0, |d| u32::try_from(d.as_millis()).unwrap_or(u32::MAX));
         let mut raw = ffi::tt_message_t {

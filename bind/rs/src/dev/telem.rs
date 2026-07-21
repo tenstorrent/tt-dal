@@ -130,7 +130,13 @@ impl Session {
     ///
     /// # Errors
     ///
-    /// Returns an error if the kernel driver fails to read telemetry.
+    /// Returns [`Unsupported`] if the device architecture is unsupported.
+    /// Returns `EIO`, observable via [`Error::raw_os_error()`], if the
+    /// telemetry data is malformed or cannot be read. Other `errno` values
+    /// propagate unchanged.
+    ///
+    /// [`Unsupported`]: std::io::ErrorKind::Unsupported
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn telemetry(&self) -> Result<Telemetry> {
         let mut table = [0u32; ffi::TT_TELEMETRY_LEN as usize];
         // SAFETY: `self.0` is an open device and `table` is valid for

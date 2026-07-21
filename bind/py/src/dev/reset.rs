@@ -16,9 +16,18 @@ impl Session {
     /// or failure. The device number does not change, so the returned
     /// `Device` descriptor can be reopened directly.
     ///
-    /// Returns an error if the kernel driver rejects the reset request, or
-    /// if another client opened the device before exclusive access could be
-    /// acquired. The session is closed even on error.
+    /// Raises `TTError` with:
+    ///
+    /// - `ENOTCONN` if the session has already been closed.
+    /// - `ENODEV` if the device does not exist.
+    /// - `EAGAIN` if another client opened the device before exclusive
+    ///   access could be acquired.
+    /// - `ECONNRESET` if the device was reset or removed out-of-band.
+    /// - `EIO` if the reset sequence failed.
+    /// - `ETIMEDOUT` if the reset did not complete in time.
+    ///
+    /// Other `errno` values propagate from the failing system call. The
+    /// session is closed even on error.
     pub fn reset(&mut self) -> PyResult<Device> {
         // SAFETY: `self.0` is a valid session handle. tt_reset_with consumes
         // it (setting fd to -1) on all paths, so no double-close can occur.
@@ -35,8 +44,15 @@ impl Device {
     /// releases it. No session is required. The reset is refused while any
     /// client (including this process) has the device open.
     ///
-    /// Returns an error if the kernel driver rejects the reset request or
-    /// the device is busy.
+    /// Raises `TTError` with:
+    ///
+    /// - `ENODEV` if the device does not exist.
+    /// - `EAGAIN` if any client (including this process) has the device open.
+    /// - `ECONNRESET` if the device was reset or removed out-of-band.
+    /// - `EIO` if the reset sequence failed.
+    /// - `ETIMEDOUT` if the reset did not complete in time.
+    ///
+    /// Other `errno` values propagate from the failing system call.
     #[pyo3(name = "reset")]
     pub fn reset_(&self) -> PyResult<()> {
         // SAFETY: `self.0` is a valid device descriptor.

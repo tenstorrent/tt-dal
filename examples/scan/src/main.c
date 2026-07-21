@@ -2,6 +2,7 @@
 
 // Example: Discover and list all Tenstorrent devices
 
+#include <errno.h>
 #include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,7 +26,7 @@ static void close_or_warn(const char *prog, tt_session_t *sess) {
             "%s: error: device %u: close failed: %s\n",
             prog,
             sess->dev.id,
-            tt_error_describe(tt_errno)
+            strerror(errno)
         );
 }
 
@@ -176,7 +177,7 @@ int main(int argc, char *argv[]) {
             stderr,
             "%s: error: failed to scan devices: %s\n",
             prog,
-            tt_error_describe(tt_errno)
+            strerror(errno)
         );
         return 1;
     }
@@ -202,7 +203,7 @@ int main(int argc, char *argv[]) {
                 "%s: error: device %u: failed to open: %s\n",
                 prog,
                 e->dev.id,
-                tt_error_describe(tt_errno)
+                strerror(errno)
             );
             continue;
         }
@@ -215,7 +216,7 @@ int main(int argc, char *argv[]) {
                 "%s: error: device %u: failed to get info: %s\n",
                 prog,
                 e->dev.id,
-                tt_error_describe(tt_errno)
+                strerror(errno)
             );
             close_or_warn(prog, &sess);
             continue;
