@@ -174,10 +174,8 @@ int tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags) {
     if (!dev || !sess)
         return tt_fail(EINVAL);
 
-    // Reject unknown flags.
-    //
-    // No flags are currently defined.
-    if (flags != 0)
+    // Reject unknown flags
+    if (flags & ~TT_OPEN_EXCL)
         return tt_fail(EINVAL);
 
     // Build path
@@ -186,12 +184,18 @@ int tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags) {
     if (len < 0 || (size_t)len >= sizeof(path))
         return tt_fail(EIO); // BUG: internal error
 
-    // Open device.
+    // Map flags onto `open(2)`.
     //
     // `O_APPEND` signals to the kernel driver that this is a power-aware
     // client. The driver initializes power to all-off for this `fd` and
-    // aggregates state across all open power-aware clients.
-    int fd = open(path, O_RDWR | O_CLOEXEC | O_APPEND);
+    // aggregates state across all open power-aware clients. `TT_OPEN_EXCL`
+    // passes through to the driver's open-time reader/writer arbitration.
+    int oflags = O_RDWR | O_CLOEXEC | O_APPEND;
+    if (flags & TT_OPEN_EXCL)
+        oflags |= O_EXCL;
+
+    // Open device
+    int fd = open(path, oflags);
     if (fd < 0)
         return tt_fail(ENODEV);
 

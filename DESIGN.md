@@ -345,11 +345,11 @@ explicit opt-ins.
 no variant functions.
 
 `tt_open()` mirrors `open(2)`: one function, with behavior selected by a
-flags bitmask. No flags are currently defined, so the plain open is just
-`flags == 0`.
+flags bitmask (`tt_open_flag_t`). `TT_OPEN_EXCL` requests the writer side of
+the kernel's open-time arbitration, and the plain open is just `flags == 0`.
 
-- Flag values are library-owned bits. The platform's numeric values never
-  enter the ABI.
+- Flag values are library-owned bits, mapped onto `O_EXCL` internally. The
+  platform's numeric values never enter the ABI.
 - Unknown bits fail with `EINVAL`, so a future flag cannot silently no-op on
   an older library.
 

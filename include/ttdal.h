@@ -320,6 +320,21 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev);
 /// ```
 ssize_t tt_dev_scan(size_t cap, tt_device_t buf[static cap]);
 
+/// Session open flags.
+///
+/// Flags for `tt_open()`. Each flag is a single bit.
+typedef enum tt_open_flag {
+    /// Exclusive access.
+    ///
+    /// Waits until no other client has the device open, then blocks all
+    /// other opens for the session's lifetime. A blocking exclusive open
+    /// can be starved by a steady stream of shared opens.
+    ///
+    /// This requires `tt-kmd` 2.10 or later, which arbitrates exclusive
+    /// access at open time. Older drivers silently ignore the flag.
+    TT_OPEN_EXCL = (1U << 0),
+} tt_open_flag_t;
+
 /// Open a session handle for a device.
 ///
 /// Opens the underlying device and initializes the session handle for use.
@@ -327,11 +342,9 @@ ssize_t tt_dev_scan(size_t cap, tt_device_t buf[static cap]);
 /// during `tt_reset()` or a flash sequence). The session struct is reusable:
 /// it may be reopened after `tt_close()`.
 ///
-/// No flags are currently defined, so pass `0`.
-///
 /// @param dev       Device descriptor.
 /// @param[out] sess Session handle to initialize.
-/// @param flags     Open flags.
+/// @param flags     Bitmask of `tt_open_flag_t` values.
 /// @return          0 on success, -1 on error (check `errno`).
 ///
 /// @par Errors
