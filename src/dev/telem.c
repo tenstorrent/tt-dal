@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
 
+#include "err.h"
 #include "ioctl.h"
 #include "ttdal.h"
 
@@ -34,11 +35,11 @@ snapshot(const volatile uint32_t *, const volatile uint32_t *, tt_telemetry_t);
 int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table) {
     // Validate args
     if (!sess || !table)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Ensure session is open
     if (sess->fd < 0)
-        return tt_errno = TT_ENOTOPEN, TT_ERR;
+        return tt_fail(ENOTCONN);
 
     // Fetch device info
     tt_dev_info_t info;
@@ -62,7 +63,7 @@ int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table) {
             noc_y      = BH_ARC_NOC_Y;
             break;
         default:
-            return tt_errno = TT_EINVAL, TT_ERR;
+            return tt_fail(ENOTSUP);
     }
 
     // Zero-initialize table
@@ -97,7 +98,7 @@ int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table) {
     // Validate CSM range
     if (ptrs.tags < CSM_BASE || ptrs.tags >= CSM_BASE + CSM_SIZE ||
         ptrs.data < CSM_BASE || ptrs.data >= CSM_BASE + CSM_SIZE) {
-        tt_errno = TT_EIO;
+        errno = EIO;
         goto cleanup;
     }
 
@@ -120,13 +121,16 @@ int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table) {
                                     (ptrs.data & (TT_TLB_2MB - 1)));
 
     // Read telemetry snapshot
-    int ret = snapshot(tags, data, table);
+    if (snapshot(tags, data, table) != 0)
+        goto cleanup;
     tt_tlb_free(sess, &tlb);
-    return ret;
+    return TT_OK;
 
 cleanup:
+    // Preserve the failure cause across the cleanup
+    int err = errno;
     tt_tlb_free(sess, &tlb);
-    return TT_ERR;
+    return tt_fail(err);
 }
 
 /// Snapshot firmware telemetry.
@@ -160,7 +164,7 @@ static int snapshot(
             continue;
         // Ensure tag isn't set
         if (map[tag] != 0xffff)
-            return tt_errno = TT_EIO, TT_ERR;
+            return tt_fail(EIO);
         // Record tag offset
         map[tag] = off;
     }
@@ -188,5 +192,5 @@ static int snapshot(
         memset(table, 0, sizeof(tt_telemetry_t));
     }
 
-    return tt_errno = TT_EIO, TT_ERR;
+    return tt_fail(EIO);
 }

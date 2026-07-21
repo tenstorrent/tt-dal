@@ -197,7 +197,13 @@ impl Session {
     ///
     /// Tags the firmware does not report read as zero.
     ///
-    /// Returns an error if the kernel driver fails to read telemetry.
+    /// Raises `TTError` with:
+    ///
+    /// - `ENOTCONN` if the session has been closed.
+    /// - `EIO` if the telemetry data is malformed or cannot be read.
+    /// - `ENOTSUP` if the device architecture is unsupported.
+    ///
+    /// Other `errno` values propagate from the failing system call.
     pub fn telemetry(&self) -> PyResult<Telemetry> {
         let mut table = vec![0u32; ffi::TT_TELEMETRY_LEN as usize];
         // SAFETY: Self is an open device and table.as_mut_ptr() is valid for

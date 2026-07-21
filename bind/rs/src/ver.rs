@@ -50,7 +50,13 @@ pub const fn library() -> Version {
 ///
 /// # Errors
 ///
-/// Returns an error if the kernel driver version query fails.
+/// Returns [`ConnectionReset`] if the device was reset or removed while
+/// querying. Returns `ENODEV`, observable via [`Error::raw_os_error()`], if
+/// no device is available. Other `errno` values from the failing `ioctl`
+/// propagate unchanged.
+///
+/// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
+/// [`Error::raw_os_error()`]: crate::Error::raw_os_error
 pub fn driver() -> Result<Version> {
     let mut raw = std::mem::MaybeUninit::<ffi::tt_version_t>::uninit();
     // SAFETY: `raw` is a valid out-pointer for `tt_version_t`.
@@ -63,7 +69,11 @@ pub fn driver() -> Result<Version> {
 ///
 /// # Errors
 ///
-/// Returns an error if the firmware version query fails.
+/// Returns `EIO`, observable via [`Error::raw_os_error()`], if the firmware
+/// version string is empty or malformed. Other `errno` values from the
+/// failing `open` or `read` propagate unchanged.
+///
+/// [`Error::raw_os_error()`]: crate::Error::raw_os_error
 pub fn firmware(dev: &Session) -> Result<Version> {
     let mut raw = std::mem::MaybeUninit::<ffi::tt_version_t>::uninit();
     // SAFETY: `dev` is an open device and `raw` is a valid out-pointer

@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
 
+#include "err.h"
 #include "ioctl.h"
 #include "ttdal.h"
 
@@ -19,7 +20,7 @@
 int tt_reset(const tt_device_t *dev) {
     // Validate args
     if (!dev)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Acquire exclusive access.
     //
@@ -27,7 +28,7 @@ int tt_reset(const tt_device_t *dev) {
     // reader/writer lock, `O_EXCL` being the writer. Acquisition succeeds
     // only when no other client has the device open, so a reset never
     // destroys another client's session out from under it. `O_NONBLOCK`
-    // fails with `EAGAIN` (mapped to `TT_EBUSY`) instead of waiting: a
+    // fails with `EAGAIN` instead of waiting: a
     // blocking exclusive open can be starved by a steady stream of plain
     // opens. Older drivers silently ignore `O_EXCL`, leaving the reset
     // unfenced.
@@ -35,7 +36,7 @@ int tt_reset(const tt_device_t *dev) {
     snprintf(path, sizeof(path), "/dev/tenstorrent/%u", dev->id);
     int fd = open(path, O_RDWR | O_CLOEXEC | O_APPEND | O_EXCL | O_NONBLOCK);
     if (fd < 0)
-        return tt_errno = (errno == EAGAIN) ? TT_EBUSY : TT_ENODEV, TT_ERR;
+        return tt_fail(errno == EAGAIN ? EAGAIN : ENODEV);
 
     // Wrap in temporary session
     tt_session_t sess = { .dev = *dev, .fd = fd };
@@ -46,9 +47,9 @@ int tt_reset(const tt_device_t *dev) {
     // polling below.
     tt_dev_info_t info;
     if (tt_dev_info(&sess, &info) < 0) {
-        tt_error_t err = tt_errno;
+        int err = errno; // saved before `close` can clobber it
         close(fd);
-        return tt_errno = err, TT_ERR;
+        return tt_fail(err);
     }
 
     // Format BDF string
@@ -78,9 +79,12 @@ int tt_reset(const tt_device_t *dev) {
         .in.output_size_bytes = sizeof(req.out),
         .in.flags             = TENSTORRENT_RESET_DEVICE_ASIC_RESET,
     };
-    if (ioctl(fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req) != 0 ||
-        req.out.result != 0)
-        return close(fd), tt_errno = TT_EIO, TT_ERR;
+    if (ioctl(fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req) != 0) {
+        int err = errno; // saved before `close` can clobber it
+        return close(fd), tt_fail_io(err);
+    }
+    if (req.out.result != 0)
+        return close(fd), tt_fail(EIO); // soft-failure
 
     // Wait for reset completion.
     //
@@ -119,17 +123,20 @@ int tt_reset(const tt_device_t *dev) {
         usleep(100000);
     }
     if (!reset_complete)
-        return close(fd), tt_errno = TT_ETIMEDOUT, TT_ERR;
+        return close(fd), tt_fail(ETIMEDOUT);
 
     // Issue post-reset on the surviving fd
     req.in.flags = TENSTORRENT_RESET_DEVICE_POST_RESET;
-    if (ioctl(fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req) != 0 ||
-        req.out.result != 0)
-        return close(fd), tt_errno = TT_EIO, TT_ERR;
+    if (ioctl(fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req) != 0) {
+        int err = errno; // saved before `close` can clobber it
+        return close(fd), tt_fail_io(err);
+    }
+    if (req.out.result != 0)
+        return close(fd), tt_fail(EIO); // soft-failure
 
     // Release exclusive access
     if (close(fd) != 0)
-        return tt_errno = TT_EIO, TT_ERR;
+        return TT_ERR;
 
     return TT_OK;
 }
@@ -143,11 +150,11 @@ int tt_reset(const tt_device_t *dev) {
 int tt_reset_with(tt_session_t *sess) {
     // Validate args
     if (!sess)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Ensure session is open
     if (sess->fd < 0)
-        return tt_errno = TT_ENOTOPEN, TT_ERR;
+        return tt_fail(ENOTCONN);
 
     // Consume session.
     //

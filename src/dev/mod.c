@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
 
+#include "err.h"
 #include "ioctl.h"
 #include "ttdal.h"
 
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
@@ -24,18 +26,18 @@
 int tt_dev_from_path(const char *path, tt_device_t *dev) {
     // Validate args
     if (!path || !dev)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Resolve symlinks to get canonical path
     char resolved[PATH_MAX];
     if (!realpath(path, resolved))
-        return tt_errno = TT_ENODEV, TT_ERR;
+        return tt_fail(ENODEV);
 
     // Expected format: /dev/tenstorrent/<number>
     const char *prefix = "/dev/tenstorrent/";
     size_t prefix_len  = strlen(prefix);
     if (strncmp(resolved, prefix, prefix_len) != 0)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Parse number
     const char *num_str = resolved + prefix_len;
@@ -45,7 +47,7 @@ int tt_dev_from_path(const char *path, tt_device_t *dev) {
     // Reject any trailing chars (e.g., by-id entries that don't resolve to
     // a plain numeric node).
     if (*endptr != '\0' || num > UINT32_MAX)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Initialize descriptor
     *dev = (tt_device_t){ .id = (uint32_t)num };
@@ -61,7 +63,7 @@ int tt_dev_from_path(const char *path, tt_device_t *dev) {
 int tt_dev_from_bdf(const char *addr, tt_device_t *dev) {
     // Validate args
     if (!addr || !dev)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Parse BDF: [DDDD:]BB:DD.F
     unsigned int domain = 0, bus, slot, func;
@@ -70,7 +72,7 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev) {
         domain = 0;
         n      = sscanf(addr, "%x:%x.%x", &bus, &slot, &func);
         if (n != 3)
-            return tt_errno = TT_EINVAL, TT_ERR;
+            return tt_fail(EINVAL);
     }
 
     // Normalize to DDDD:BB:DD.F for comparison
@@ -93,7 +95,7 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev) {
     // The buffer bound is an implementation convenience, not part of the
     // function's contract. It is chosen to exceed the device count of any
     // current system. A device beyond the bound would be missed, reporting
-    // `TT_ENODEV`.
+    // `ENODEV`.
     tt_device_t devs[64];
     ssize_t count = tt_dev_scan(sizeof(devs) / sizeof(devs[0]), devs);
     for (ssize_t i = 0; i < count; i++) {
@@ -122,17 +124,20 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev) {
         }
     }
 
-    return tt_errno = TT_ENODEV, TT_ERR;
+    return tt_fail(ENODEV);
 }
 
 /// Scan for connected devices.
 ///
 /// Scans `/dev/tenstorrent/` directory for character devices.
 ssize_t tt_dev_scan(size_t cap, tt_device_t buf[static cap]) {
-    // Scan device directory
+    // Scan device directory.
+    //
+    // A missing directory means the driver is not loaded, so it scans as
+    // zero devices rather than failing.
     DIR *dir = opendir("/dev/tenstorrent");
     if (!dir)
-        return tt_errno = TT_ENODEV, TT_ERR;
+        return (errno == ENOENT) ? 0 : TT_ERR;
 
     // Enumerate entries
     size_t count = 0;
@@ -167,13 +172,13 @@ ssize_t tt_dev_scan(size_t cap, tt_device_t buf[static cap]) {
 int tt_open(const tt_device_t *dev, tt_session_t *sess) {
     // Validate args
     if (!dev || !sess)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Build path
     char path[PATH_MAX];
     int len = snprintf(path, sizeof(path), "/dev/tenstorrent/%u", dev->id);
     if (len < 0 || (size_t)len >= sizeof(path))
-        return tt_errno = TT_ENOBUFS, TT_ERR; // BUG: internal error
+        return tt_fail(EIO); // BUG: internal error
 
     // Open device.
     //
@@ -182,7 +187,7 @@ int tt_open(const tt_device_t *dev, tt_session_t *sess) {
     // aggregates state across all open power-aware clients.
     int fd = open(path, O_RDWR | O_CLOEXEC | O_APPEND);
     if (fd < 0)
-        return tt_errno = TT_ENODEV, TT_ERR;
+        return tt_fail(ENODEV);
 
     // Initialize session
     *sess = (tt_session_t){ .dev = *dev, .fd = fd };
@@ -196,7 +201,7 @@ int tt_open(const tt_device_t *dev, tt_session_t *sess) {
 int tt_close(tt_session_t *sess) {
     // Validate args
     if (!sess)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Already closed
     if (sess->fd < 0)
@@ -204,7 +209,7 @@ int tt_close(tt_session_t *sess) {
 
     // Close `fd`
     if (close(sess->fd) != 0)
-        return tt_errno = TT_EIO, TT_ERR;
+        return TT_ERR;
 
     // Sentinel `fd`.
     //
@@ -221,18 +226,18 @@ int tt_close(tt_session_t *sess) {
 int tt_dev_info(const tt_session_t *sess, tt_dev_info_t *info) {
     // Validate args
     if (!sess || !info)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Ensure session is open
     if (sess->fd < 0)
-        return tt_errno = TT_ENOTOPEN, TT_ERR;
+        return tt_fail(ENOTCONN);
 
     // Query device info
     struct tenstorrent_get_device_info query = {
         .in.output_size_bytes = sizeof(query.out),
     };
     if (ioctl(sess->fd, TENSTORRENT_IOCTL_GET_DEVICE_INFO, &query) != 0)
-        return tt_errno = TT_EIO, TT_ERR;
+        return tt_fail_io(errno);
 
     // Unpack output
     *info = (tt_dev_info_t){

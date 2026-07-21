@@ -135,26 +135,44 @@ each site in the source that depends on a versioned driver feature.
 
 #### Error Handling Strategy
 
-**TL;DR**: Functions return `-1` on error and set thread-local `tt_errno` to a
-specific error code from `tt_error_t`.
+**TL;DR**: Functions return `-1` on error and leave the cause in `errno`,
+exactly like libc.
 
-The error handling follows **libc** conventions closely. All functions return
-`-1` (defined as `TT_ERR`) to indicate failure and set the thread-local
-`tt_errno` to a specific error code. On success, functions return `0` (defined
-as `TT_OK`) or a meaningful non-negative value.
+The library defines no error space of its own. Errors from the OS propagate
+untouched unless a standard value names the failure more precisely, in which
+case the library reports that value instead. Callers see familiar `errno`
+names (`ENODEV`, `EAGAIN`) rather than a private error vocabulary. The library
+raises standard `errno` values for the failures it detects itself: `EINVAL`
+(bad argument), `ENOTCONN` (session not open), `ENODEV` (device not found,
+normalized from device lookups), `EIO` (device I/O failed, also raised for
+driver soft-failures), `ETIMEDOUT` (reset did not complete), and `ENOTSUP`
+(unsupported device architecture).
+
+One value is normalized rather than propagated: a session operation that
+fails with `ENODEV` had its descriptor invalidated by an out-of-band reset
+or removal, which reports as `ECONNRESET`. The normalization is sound
+because the caller holds proof the device existed, and it deliberately
+conflates reset with removal. Reopening distinguishes them: the open
+succeeds after a reset and reports `ENODEV` after a removal, and
+reconnecting never yields `ECONNRESET`.
+
+Per the libc convention, `errno` is meaningful only after a `-1` return. A
+successful call may leave unrelated residue there, so callers must check the
+return value before inspecting `errno`.
 
 **Error setting pattern**:
 ```c
-// Use comma operator to set errno and return -1
-return tt_errno = TT_EINVAL, -1;
+// Record a library-detected failure and return -1. Syscall failures
+// propagate errno by returning TT_ERR directly, and session operations
+// route through tt_fail_io(errno) for the ECONNRESET normalization.
+return tt_fail(EINVAL);
 ```
 
 **Error checking pattern**:
 ```c
-// Check for failure, then inspect tt_errno
+// Check for failure, then inspect errno
 if (tt_open(&dev, &sess) < 0) {
-    const char *msg = tt_error_describe(tt_errno);
-    fprintf(stderr, "Open failed: %s\n", msg);
+    fprintf(stderr, "Open failed: %s\n", strerror(errno));
 }
 ```
 
@@ -209,8 +227,12 @@ tt_close(&sess);
 ```
 
 This gives users control over when to release resources while avoiding repeated
-open/close overhead on every operation. Functions return `TT_ENOTOPEN` if
+open/close overhead on every operation. Functions fail with `ENOTCONN` if
 called on a closed session.
+
+Enumeration is not an error path: `tt_dev_scan()` reports an absent driver as
+zero devices, since a machine without the driver has none. Callers that
+require a device raise `ENODEV` themselves.
 
 #### TLB Lifecycle Safety
 
@@ -264,7 +286,7 @@ device access.
 #### Reset Semantics
 
 **TL;DR**: Reset always runs exclusively. `tt_reset()` acquires exclusive
-access internally and fails with `TT_EBUSY` if the device is in use.
+access internally and fails with `EAGAIN` if the device is in use.
 `tt_reset_with()` consumes an open session, then does the same.
 
 Reset comes in two forms:
@@ -283,7 +305,7 @@ when no other client has the device open, so a reset never destroys another
 client's session out from under it.
 
 Acquisition does not wait: if the device is busy, reset fails with
-`TT_EBUSY` rather than resetting under other clients or blocking
+`EAGAIN` rather than resetting under other clients or blocking
 indefinitely (the kernel's blocking exclusive open can be starved by a
 steady stream of plain opens). The issuing descriptor survives the driver's
 reset generation bump, so the sequence runs on one fd with no close/reopen
@@ -296,7 +318,7 @@ on all paths, success or failure, exactly as if `tt_close()` had been
 called: a half-reset device behind a maybe-valid file descriptor is a
 silent corruption hazard. Another client may open the device in the window
 between the close and the exclusive acquisition, in which case the reset
-fails with `TT_EBUSY`.
+fails with `EAGAIN`.
 
 **In place**: The driver keeps the device instance alive across the reset,
 so the device number does not change and descriptors remain valid for
@@ -459,7 +481,7 @@ version bump:
 - Changing function signatures.
 - Removing or renaming public API functions.
 - Adding, removing, or reordering structure fields.
-- Changing error code numeric values.
+- Changing the `errno` reported for an existing failure.
 - Removing or changing enum values.
 
 Note: Adding fields to transparent, caller-allocated structs breaks ABI because
@@ -470,7 +492,7 @@ it changes `sizeof()` and invalidates existing stack allocations.
 The following changes are permitted in minor or patch releases:
 
 - Adding new functions.
-- Adding new error codes with new numeric values.
+- Reporting new `errno` values for new failure modes.
 - Adding new enum members.
 - Adding new architecture support.
 - Bug fixes that don't change API behavior.

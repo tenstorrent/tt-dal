@@ -14,7 +14,11 @@ use pyo3::prelude::*;
 
 /// Discovers all connected Tenstorrent devices.
 ///
-/// Returns an error if the kernel driver scan fails.
+/// A missing device directory means the driver is not loaded, so it scans
+/// as zero devices rather than failing.
+///
+/// Raises `TTError` carrying any `errno` left by the failing directory
+/// scan.
 #[pyfunction]
 pub fn scan() -> PyResult<Vec<Device>> {
     // Grow-and-retry until all devices fit. `tt_dev_scan` returns the total
@@ -49,9 +53,16 @@ pub struct Device(pub(crate) ffi::tt_device_t);
 #[pymethods]
 impl Device {
     /// Creates a device descriptor from a `/dev/tenstorrent/N` path.
+    ///
+    /// Raises `TTError` with:
+    ///
+    /// - `EINVAL` if `path` contains an interior nul byte or does not name a
+    ///   `/dev/tenstorrent/` device node.
+    /// - `ENODEV` if the path does not resolve to a device.
     #[staticmethod]
     pub fn from_path(path: &str) -> PyResult<Self> {
-        let path = CString::new(path).map_err(|_| crate::err::Error::new_err("invalid path"))?;
+        let path = CString::new(path)
+            .map_err(|_| crate::err::TTError::new_err((libc::EINVAL, "invalid path")))?;
         let mut raw = MaybeUninit::<ffi::tt_device_t>::uninit();
         // SAFETY: `path` is a valid null-terminated C string and raw is a valid
         // out-pointer for tt_device_t.
@@ -62,9 +73,15 @@ impl Device {
 
     /// Creates a device descriptor from a PCIe bus/device/function (BDF)
     /// address (e.g., `"0000:03:00.0"`).
+    ///
+    /// Raises `TTError` with:
+    ///
+    /// - `EINVAL` if `addr` contains an interior nul byte or is malformed.
+    /// - `ENODEV` if no connected device matches the address.
     #[staticmethod]
     pub fn from_bdf(addr: &str) -> PyResult<Self> {
-        let addr = CString::new(addr).map_err(|_| crate::err::Error::new_err("invalid address"))?;
+        let addr = CString::new(addr)
+            .map_err(|_| crate::err::TTError::new_err((libc::EINVAL, "invalid address")))?;
         let mut raw = MaybeUninit::<ffi::tt_device_t>::uninit();
         // SAFETY: `addr` is a valid null-terminated C string and raw is a valid
         // out-pointer for tt_device_t.
@@ -81,7 +98,7 @@ impl Device {
 
     /// Opens the device and returns a `Session` that owns the handle.
     ///
-    /// Returns an error if the kernel driver fails to open the device.
+    /// Raises `TTError` with `ENODEV` if the device could not be opened.
     pub fn open(&self) -> PyResult<Session> {
         let mut raw = MaybeUninit::<ffi::tt_session_t>::uninit();
         // SAFETY: `self.0` is a valid device descriptor and raw is a valid
@@ -136,6 +153,8 @@ impl Session {
     /// Closes the session explicitly.
     ///
     /// Idempotent, so closing an already-closed session is a no-op.
+    ///
+    /// Raises `TTError` carrying any `errno` left by the failing `close(2)`.
     pub fn close(&mut self) -> PyResult<()> {
         if !self.is_closed() {
             // SAFETY: `self.0` is an open session. Closing exactly once is safe.
@@ -151,7 +170,13 @@ impl Session {
 
     /// Returns static information about the device.
     ///
-    /// Returns an error if the kernel driver fails to retrieve device info.
+    /// Raises `TTError` with:
+    ///
+    /// - `ENOTCONN` if the session has been closed.
+    /// - `ECONNRESET` if the session was severed by an out-of-band device
+    ///   reset or removal.
+    ///
+    /// Other `errno` values propagate from the failing system call.
     pub fn info(&self) -> PyResult<Info> {
         // SAFETY: Zeroing tt_dev_info_t is valid. All fields are plain integers.
         let mut info: ffi::tt_dev_info_t = unsafe { std::mem::zeroed() };

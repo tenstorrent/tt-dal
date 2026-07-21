@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <ttdal.h>
 
@@ -14,6 +15,6 @@ int main(void) {
     // Request all four defined power flags together
     int rc = tt_power(sess, 0x000F);
     if (rc < 0)
-        printf("combined (0x000F) failed: tt_errno=%d\n", tt_errno);
+        printf("combined (0x000F) failed: errno=%d\n", errno);
     tt_close(sess);
 }

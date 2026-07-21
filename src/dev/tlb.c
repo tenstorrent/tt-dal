@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
 
+#include "err.h"
 #include "ioctl.h"
 #include "ttdal.h"
 
+#include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
@@ -18,18 +20,18 @@ int tt_tlb_alloc(
 ) {
     // Validate args
     if (!sess || !tlb)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Ensure session is open
     if (sess->fd < 0)
-        return tt_errno = TT_ENOTOPEN, TT_ERR;
+        return tt_fail(ENOTCONN);
 
     // Allocate TLB
     struct tenstorrent_allocate_tlb alloc = {
         .in.size = (size_t)size,
     };
     if (ioctl(sess->fd, TENSTORRENT_IOCTL_ALLOCATE_TLB, &alloc) != 0)
-        return tt_errno = TT_ENOMEM, TT_ERR;
+        return tt_fail_io(errno);
 
     // Populate TLB
     *tlb = (tt_tlb_t){
@@ -52,18 +54,18 @@ int tt_tlb_alloc(
             break;
         default:
             // Invalid cache mode
-            tt_errno = TT_EINVAL;
+            errno = EINVAL;
             goto cleanup;
     }
 
     return TT_OK;
 
 cleanup:
-    // Free the newly allocated TLB
+    // Free the newly allocated TLB, preserving the failure cause across
+    // the cleanup.
+    int err = errno;
     tt_tlb_free(sess, tlb);
-
-failure:
-    return TT_ERR;
+    return tt_fail(err);
 }
 
 /// Bind TLB to a NOC address.
@@ -75,11 +77,11 @@ int tt_tlb_bind(
 ) {
     // Validate args
     if (!sess || !tlb || !cfg)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Ensure session is open
     if (sess->fd < 0)
-        return tt_errno = TT_ENOTOPEN, TT_ERR;
+        return tt_fail(ENOTCONN);
 
     // Map TLB into user space.
     //
@@ -92,7 +94,7 @@ int tt_tlb_bind(
     );
     if (ptr == MAP_FAILED) {
         // `mmap` failed
-        tt_errno = TT_ENOMEM;
+        tt_fail_io(errno);
         // Clean up the previous mapping
         goto cleanup;
     }
@@ -113,10 +115,11 @@ int tt_tlb_bind(
     };
     if (ioctl(sess->fd, TENSTORRENT_IOCTL_CONFIGURE_TLB, &mapping) != 0) {
         // `ioctl` failed
-        tt_errno = TT_EINVAL;
+        int err = errno;
         // Unmap the new mapping we just created before cleaning up the old
         // mapping (if reconfigure).
         munmap(ptr, tlb->len);
+        tt_fail_io(err);
         goto cleanup;
     }
 
@@ -131,14 +134,14 @@ int tt_tlb_bind(
 
 cleanup:
     // Unmap previous mapping, leaving the TLB completely unconfigured, to
-    // ensure users can't accidentally use the (now) invalid mapping.
+    // ensure users can't accidentally use the (now) invalid mapping. The
+    // failure cause is preserved across the cleanup.
+    int err = errno;
     if (tlb->ptr != NULL) {
         munmap(tlb->ptr, tlb->len);
         tlb->ptr = NULL;
     }
-
-failure:
-    return TT_ERR;
+    return tt_fail(err);
 }
 
 /// Free a TLB window.
@@ -147,17 +150,17 @@ failure:
 int tt_tlb_free(const tt_session_t *sess, tt_tlb_t *tlb) {
     // Validate args
     if (!sess || !tlb)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Ensure session is open
     if (sess->fd < 0)
-        return tt_errno = TT_ENOTOPEN, TT_ERR;
+        return tt_fail(ENOTCONN);
 
     // Unmap TLB.
     //
     // Skip if unconfigured (nothing to unmap).
     if (tlb->ptr != NULL && munmap(tlb->ptr, tlb->len) != 0)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return TT_ERR;
     tlb->ptr = NULL;
 
     // Free TLB
@@ -165,7 +168,7 @@ int tt_tlb_free(const tt_session_t *sess, tt_tlb_t *tlb) {
         .in.id = tlb->id,
     };
     if (ioctl(sess->fd, TENSTORRENT_IOCTL_FREE_TLB, &free) != 0)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail_io(errno);
     tlb->id = 0;
 
     return TT_OK;

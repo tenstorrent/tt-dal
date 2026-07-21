@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <ttdal.h>
 
@@ -14,6 +15,6 @@ int main(void) {
     // Enable L2CPU
     int rc = tt_power(sess, TT_POWER_L2CPU_ENABLE);
     if (rc < 0)
-        printf("l2cpu_enable failed: tt_errno=%d\n", tt_errno);
+        printf("l2cpu_enable failed: errno=%d\n", errno);
     tt_close(sess);
 }

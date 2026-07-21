@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include <assert.h>
+#include <errno.h>
 #include <ttdal.h>
 
 // MARK: hardware
@@ -12,6 +13,6 @@ int main(void) {
         return EXIT_FAILURE;
     // NULL info pointer must be rejected even on an open session
     assert(tt_dev_info(sess, NULL) < 0);
-    assert(tt_errno == TT_EINVAL);
+    assert(errno == EINVAL);
     tt_close(sess);
 }

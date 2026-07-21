@@ -17,6 +17,9 @@ pub struct Message(pub(crate) ffi::tt_message_t);
 
 #[pymethods]
 impl Message {
+    /// Creates an ARC message with the given code and data words.
+    ///
+    /// Raises `ValueError` if `data` has more than 8 elements.
     #[new]
     #[pyo3(signature = (code=0, data=None))]
     fn new(code: u8, data: Option<Vec<u32>>) -> PyResult<Self> {
@@ -50,6 +53,9 @@ impl Message {
         self.0.data.to_vec()
     }
 
+    /// Sets the message data words.
+    ///
+    /// Raises `ValueError` if `data` has more than 8 elements.
     #[setter]
     fn set_data(&mut self, data: Vec<u32>) -> PyResult<()> {
         if data.len() > 8 {
@@ -78,8 +84,9 @@ impl Session {
     /// Set `wait` to block until the controller responds. `timeout` of `None`
     /// uses the driver default.
     ///
-    /// Returns an error if the ARC message fails or the controller reports an
-    /// error code.
+    /// Raises `TTError` with `ENOTCONN` if the session has been closed.
+    /// ARC messaging is otherwise not yet implemented, so the underlying
+    /// call aborts before returning.
     #[pyo3(signature = (msg, wait=true, timeout=None))]
     pub fn message(&self, msg: Message, wait: bool, timeout: Option<u32>) -> PyResult<Message> {
         let mut raw = msg.0;

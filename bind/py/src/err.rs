@@ -1,31 +1,30 @@
 //! Error reporting.
 
-use crate::ffi;
 use std::ffi::CStr;
 
 use pyo3::create_exception;
+use pyo3::exceptions::PyOSError;
 use pyo3::prelude::*;
 
-create_exception!(ttdal, Error, pyo3::exceptions::PyException);
+create_exception!(ttdal, TTError, PyOSError);
 
 /// Converts a C-style `tt-dal` return code into a `PyResult`.
+///
+/// On failure, raises a `TTError` carrying the `errno` left behind by
+/// the failing call and its `strerror()` description.
 pub(crate) fn check(ret: core::ffi::c_int) -> PyResult<()> {
     if ret == 0 {
-        Ok(())
-    } else {
-        // SAFETY: `tt_get_errno` reads the thread-local `tt_errno` set by the
-        // most recent failing `tt-dal` call on this thread.
-        let errno = unsafe { ffi::tt_get_errno() };
-        // SAFETY: `tt_error_describe` returns a pointer to a static C string
-        // literal or NULL. If non-null, it is always null-terminated.
-        let ptr = unsafe { ffi::tt_error_describe(errno) };
-        let msg = if !ptr.is_null() {
-            unsafe { CStr::from_ptr(ptr) }
-                .to_string_lossy()
-                .into_owned()
-        } else {
-            format!("tt-dal error {errno}")
-        };
-        Err(Error::new_err(msg))
+        return Ok(());
     }
+
+    // Read the errno left behind by the failing call
+    let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+
+    // SAFETY: `strerror` returns a pointer to a static, null-terminated
+    // string for any value.
+    let msg = unsafe { CStr::from_ptr(libc::strerror(errno)) }
+        .to_string_lossy()
+        .into_owned();
+
+    Err(TTError::new_err((errno, msg)))
 }

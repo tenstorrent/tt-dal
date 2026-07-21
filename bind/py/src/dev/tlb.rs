@@ -169,6 +169,14 @@ impl Tlb {
     /// Frees the TLB window explicitly.
     ///
     /// Idempotent, so freeing an already-freed TLB is a no-op.
+    ///
+    /// Raises `TTError` with:
+    ///
+    /// - `ENOTCONN` if the session has been closed.
+    /// - `ECONNRESET` if the session was severed by an out-of-band device
+    ///   reset or removal.
+    ///
+    /// Other `errno` values propagate from the failing system call.
     pub fn free(&mut self, py: Python<'_>) -> PyResult<()> {
         if !self.freed {
             self.freed = true;
@@ -185,7 +193,14 @@ impl Tlb {
     ///
     /// Safe to call again after the previous `Window` has been dropped.
     ///
-    /// Returns an error if the kernel driver rejects the configuration.
+    /// Raises `RuntimeError` if the TLB has already been freed. Otherwise
+    /// raises `TTError` with:
+    ///
+    /// - `ENOTCONN` if the session has been closed.
+    /// - `ECONNRESET` if the session was severed by an out-of-band device
+    ///   reset or removal.
+    ///
+    /// Other `errno` values propagate from the failing system call.
     fn bind(mut self_: PyRefMut<'_, Self>, cfg: &Config, py: Python<'_>) -> PyResult<Window> {
         if self_.freed {
             return Err(PyRuntimeError::new_err("TLB has been freed"));
@@ -267,6 +282,8 @@ impl Window {
     }
 
     /// Reads a u8 at the given byte offset.
+    ///
+    /// Raises `IndexError` if `offset` is out of bounds.
     fn read_u8(&self, offset: usize, py: Python<'_>) -> PyResult<u8> {
         let tlb = self.tlb.borrow(py);
         if offset >= tlb.raw.len {
@@ -279,6 +296,9 @@ impl Window {
     }
 
     /// Reads a u32 at the given byte offset (must be 4-byte aligned).
+    ///
+    /// Raises `ValueError` if `offset` is not 4-byte aligned, or `IndexError`
+    /// if it is out of bounds.
     fn read_u32(&self, offset: usize, py: Python<'_>) -> PyResult<u32> {
         let tlb = self.tlb.borrow(py);
         if !offset.is_multiple_of(4) {
@@ -294,6 +314,9 @@ impl Window {
     }
 
     /// Reads a u64 at the given byte offset (must be 8-byte aligned).
+    ///
+    /// Raises `ValueError` if `offset` is not 8-byte aligned, or `IndexError`
+    /// if it is out of bounds.
     fn read_u64(&self, offset: usize, py: Python<'_>) -> PyResult<u64> {
         let tlb = self.tlb.borrow(py);
         if !offset.is_multiple_of(8) {
@@ -309,6 +332,8 @@ impl Window {
     }
 
     /// Writes a u8 at the given byte offset.
+    ///
+    /// Raises `IndexError` if `offset` is out of bounds.
     fn write_u8(&self, offset: usize, value: u8, py: Python<'_>) -> PyResult<()> {
         let tlb = self.tlb.borrow(py);
         if offset >= tlb.raw.len {
@@ -322,6 +347,9 @@ impl Window {
     }
 
     /// Writes a u32 at the given byte offset (must be 4-byte aligned).
+    ///
+    /// Raises `ValueError` if `offset` is not 4-byte aligned, or `IndexError`
+    /// if it is out of bounds.
     fn write_u32(&self, offset: usize, value: u32, py: Python<'_>) -> PyResult<()> {
         let tlb = self.tlb.borrow(py);
         if !offset.is_multiple_of(4) {
@@ -338,6 +366,9 @@ impl Window {
     }
 
     /// Writes a u64 at the given byte offset (must be 8-byte aligned).
+    ///
+    /// Raises `ValueError` if `offset` is not 8-byte aligned, or `IndexError`
+    /// if it is out of bounds.
     fn write_u64(&self, offset: usize, value: u64, py: Python<'_>) -> PyResult<()> {
         let tlb = self.tlb.borrow(py);
         if !offset.is_multiple_of(8) {
@@ -366,7 +397,13 @@ impl Session {
     ///
     /// The window is not mapped until `Tlb.bind()` is called.
     ///
-    /// Returns an error if the kernel driver fails to allocate the window.
+    /// Raises `TTError` with:
+    ///
+    /// - `ENOTCONN` if the session has been closed.
+    /// - `ECONNRESET` if the session was severed by an out-of-band device
+    ///   reset or removal.
+    ///
+    /// Other `errno` values propagate from the failing system call.
     pub fn alloc(
         slf: PyRef<'_, Self>,
         size: Size,

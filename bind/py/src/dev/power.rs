@@ -14,7 +14,7 @@ use pyo3::prelude::*;
 /// Power feature flag.
 ///
 /// A single controllable power feature on the device. Combine flags with `|`
-/// and pass to `Session.request_power()` to request the desired power state.
+/// and pass to `Session.power()` to request the desired power state.
 #[pyclass(skip_from_py_object)]
 #[derive(Clone, Copy)]
 pub struct Flag(pub u16);
@@ -100,8 +100,14 @@ impl Session {
     /// client requests. Each client's contribution is removed when its session
     /// is closed.
     ///
-    /// Returns an error if the kernel driver rejects the request.
-    pub fn request_power(&self, flags: &Flag) -> PyResult<()> {
+    /// Raises `TTError` with:
+    ///
+    /// - `ENOTCONN` if the session has been closed.
+    /// - `ECONNRESET` if the session was severed by an out-of-band device
+    ///   reset or removal.
+    ///
+    /// Other `errno` values propagate from the failing system call.
+    pub fn power(&self, flags: &Flag) -> PyResult<()> {
         // SAFETY: Self is an open device and flags.0 is a valid bitmask.
         crate::err::check(unsafe { ffi::tt_power(Session::as_ptr(self), flags.0) })
     }

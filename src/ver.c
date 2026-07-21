@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
 
+#include "err.h"
 #include "ioctl.h"
 #include "ttdal.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdio.h>
@@ -16,15 +18,18 @@
 int tt_version_driver(tt_version_t *version) {
     // Validate args
     if (!version)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Use first available device.
     //
     // Driver version is global to the kernel module, so any open `fd`
     // suffices to issue the query.
     tt_device_t dev;
-    if (tt_dev_scan(1, &dev) <= 0)
-        return tt_errno = TT_ENODEV, TT_ERR;
+    ssize_t found = tt_dev_scan(1, &dev);
+    if (found < 0)
+        return TT_ERR;
+    if (found == 0)
+        return tt_fail(ENODEV);
     tt_session_t sess;
     if (tt_open(&dev, &sess) < 0)
         return TT_ERR;
@@ -34,9 +39,10 @@ int tt_version_driver(tt_version_t *version) {
         .in.output_size_bytes = sizeof(query.out),
     };
     int res = ioctl(sess.fd, TENSTORRENT_IOCTL_GET_DRIVER_INFO, &query);
+    int err = errno; // saved before `tt_close` can clobber it
     tt_close(&sess);
     if (res != 0)
-        return tt_errno = TT_EIO, TT_ERR;
+        return tt_fail_io(err);
 
     // Fill output
     *version = (tt_version_t){
@@ -55,11 +61,11 @@ int tt_version_driver(tt_version_t *version) {
 int tt_version_firmware(const tt_session_t *sess, tt_version_t *version) {
     // Validate args
     if (!sess || !version)
-        return tt_errno = TT_EINVAL, TT_ERR;
+        return tt_fail(EINVAL);
 
     // Ensure session is open
     if (sess->fd < 0)
-        return tt_errno = TT_ENOTOPEN, TT_ERR;
+        return tt_fail(ENOTCONN);
 
     // Build sysfs path
     char path[64];
@@ -73,13 +79,14 @@ int tt_version_firmware(const tt_session_t *sess, tt_version_t *version) {
     // Read version string
     int fd = open(path, O_RDONLY);
     if (fd < 0)
-        return tt_errno = TT_EIO, TT_ERR;
+        return TT_ERR;
 
     char buf[32];
     ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    int err   = (n < 0) ? errno : EIO; // an empty read has no OS cause
     close(fd);
     if (n <= 0)
-        return tt_errno = TT_EIO, TT_ERR;
+        return tt_fail(err);
     buf[n] = '\0';
 
     // Parse "major.minor.patch.rc"
@@ -92,7 +99,7 @@ int tt_version_firmware(const tt_session_t *sess, tt_version_t *version) {
             &patch,
             &rc
         ) != 4)
-        return tt_errno = TT_EIO, TT_ERR;
+        return tt_fail(EIO);
 
     *version = (tt_version_t){
         .major = major,

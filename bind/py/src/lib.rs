@@ -22,7 +22,7 @@ fn ttdal(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let py = m.py();
 
     // Exception
-    m.add("Error", py.get_type::<err::Error>())?;
+    m.add("TTError", py.get_type::<err::TTError>())?;
 
     // Device discovery and lifecycle
     m.add_function(wrap_pyfunction!(dev::scan, m)?)?;

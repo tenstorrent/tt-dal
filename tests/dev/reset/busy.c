@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
 
 #include <assert.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <ttdal.h>
 
@@ -14,7 +15,7 @@ int main(void) {
     tt_session_t sess;
     assert(tt_open(&dev, &sess) == 0);
     assert(tt_reset(&dev) < 0);
-    assert(tt_errno == TT_EBUSY);
+    assert(errno == EAGAIN);
     assert(tt_close(&sess) == 0);
 
     // Reset must succeed once the device is released
