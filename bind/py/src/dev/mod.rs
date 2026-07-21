@@ -98,16 +98,23 @@ impl Device {
 
     /// Opens the device and returns a `Session` that owns the handle.
     ///
-    /// Blocks while another client holds the device exclusively. Set
-    /// `exclusive` to wait for sole access, then block other opens for the
-    /// session's lifetime.
+    /// Blocks while another client holds the device exclusively unless
+    /// `nonblocking` is set. Set `exclusive` to wait for sole access, then
+    /// block other opens for the session's lifetime.
     ///
-    /// Raises `TTError` with `ENODEV` if the device could not be opened.
-    #[pyo3(signature = (*, exclusive = false))]
-    pub fn open(&self, exclusive: bool) -> PyResult<Session> {
+    /// Raises `TTError` with:
+    ///
+    /// - `ENODEV` if the device could not be opened.
+    /// - `EAGAIN` if `nonblocking` is set and another client holds the
+    ///   device incompatibly.
+    #[pyo3(signature = (*, exclusive = false, nonblocking = false))]
+    pub fn open(&self, exclusive: bool, nonblocking: bool) -> PyResult<Session> {
         let mut flags = 0;
         if exclusive {
             flags |= ffi::TT_OPEN_EXCL;
+        }
+        if nonblocking {
+            flags |= ffi::TT_OPEN_NONBLOCK;
         }
         let mut raw = MaybeUninit::<ffi::tt_session_t>::uninit();
         // SAFETY: `self.0` is a valid device descriptor and raw is a valid

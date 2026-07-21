@@ -328,11 +328,18 @@ typedef enum tt_open_flag {
     ///
     /// Waits until no other client has the device open, then blocks all
     /// other opens for the session's lifetime. A blocking exclusive open
-    /// can be starved by a steady stream of shared opens.
+    /// can be starved by a steady stream of shared opens, so combine with
+    /// `TT_OPEN_NONBLOCK` to fail fast.
     ///
     /// This requires `tt-kmd` 2.10 or later, which arbitrates exclusive
     /// access at open time. Older drivers silently ignore the flag.
-    TT_OPEN_EXCL = (1U << 0),
+    TT_OPEN_EXCL     = (1U << 0),
+    /// Non-blocking open.
+    ///
+    /// Fails with `EAGAIN` instead of waiting: an exclusive open fails
+    /// while any other client has the device open, and a shared open fails
+    /// while another client holds the device exclusively.
+    TT_OPEN_NONBLOCK = (1U << 1),
 } tt_open_flag_t;
 
 /// Open a session handle for a device.
@@ -352,6 +359,8 @@ typedef enum tt_open_flag {
 /// * `EINVAL`     `dev` or `sess` is `NULL`, or `flags` contains unknown
 ///                bits.
 /// * `ENODEV`     The device could not be opened.
+/// * `EAGAIN`     `TT_OPEN_NONBLOCK` is set and another client holds the
+///                device incompatibly.
 int tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags);
 
 /// Close a session handle.

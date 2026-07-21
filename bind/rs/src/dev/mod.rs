@@ -319,6 +319,7 @@ impl Session {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct OpenOptions {
     excl: bool,
+    nonblock: bool,
 }
 
 impl OpenOptions {
@@ -339,13 +340,27 @@ impl OpenOptions {
         self
     }
 
+    /// Sets the option for non-blocking opens.
+    ///
+    /// This option, when true, fails the open with [`WouldBlock`] instead
+    /// of waiting for another client to release the device.
+    ///
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
+    pub fn nonblocking(&mut self, nonblock: bool) -> &mut Self {
+        self.nonblock = nonblock;
+        self
+    }
+
     /// Opens a session for the device with the options specified by `self`.
     ///
     /// # Errors
     ///
-    /// Returns `ENODEV`, observable via [`Error::raw_os_error()`], if the
-    /// device does not exist.
+    /// Returns [`WouldBlock`] if [`nonblocking`] is set and another client
+    /// holds the device incompatibly. Returns `ENODEV`, observable via
+    /// [`Error::raw_os_error()`], if the device does not exist.
     ///
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
+    /// [`nonblocking`]: Self::nonblocking
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn open(&self, dev: Device) -> Result<Session> {
         let mut raw = MaybeUninit::<ffi::tt_session_t>::uninit();
@@ -362,6 +377,9 @@ impl OpenOptions {
         let mut flags = 0;
         if self.excl {
             flags |= ffi::TT_OPEN_EXCL;
+        }
+        if self.nonblock {
+            flags |= ffi::TT_OPEN_NONBLOCK;
         }
         flags as u16
     }
