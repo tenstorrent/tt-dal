@@ -317,13 +317,26 @@ impl Session {
 ///
 /// [`open()`]: Self::open
 #[derive(Clone, Copy, Debug, Default)]
-pub struct OpenOptions {}
+pub struct OpenOptions {
+    excl: bool,
+}
 
 impl OpenOptions {
     /// Creates a blank new set of options ready for configuration.
+    ///
+    /// All options are initially set to `false`.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Sets the option for exclusive access.
+    ///
+    /// This option, when true, waits until no other client has the device
+    /// open, then blocks all other opens for the session's lifetime.
+    pub fn exclusive(&mut self, excl: bool) -> &mut Self {
+        self.excl = excl;
+        self
     }
 
     /// Opens a session for the device with the options specified by `self`.
@@ -338,9 +351,19 @@ impl OpenOptions {
         let mut raw = MaybeUninit::<ffi::tt_session_t>::uninit();
         // SAFETY: `dev.0` is a valid device descriptor and `raw` is a valid
         // out-pointer for `tt_session_t`.
-        err::check(unsafe { ffi::tt_open(&raw const dev.0, raw.as_mut_ptr(), 0) })?;
+        err::check(unsafe { ffi::tt_open(&raw const dev.0, raw.as_mut_ptr(), self.flags()) })?;
         // SAFETY: `raw` was fully initialized by the successful call above.
         Ok(Session(unsafe { raw.assume_init() }))
+    }
+
+    /// Returns the flag bits selected by these options.
+    #[expect(clippy::cast_possible_truncation)]
+    fn flags(self) -> u16 {
+        let mut flags = 0;
+        if self.excl {
+            flags |= ffi::TT_OPEN_EXCL;
+        }
+        flags as u16
     }
 }
 
