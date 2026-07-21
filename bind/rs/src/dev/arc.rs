@@ -52,18 +52,20 @@ impl Session {
     /// before returning.
     pub fn message(&self, msg: Message, wait: bool, timeout: Option<Duration>) -> Result<Message> {
         let timeout = timeout.map_or(0, |d| u32::try_from(d.as_millis()).unwrap_or(u32::MAX));
-        let mut raw = ffi::tt_message_t {
-            code: msg.code,
-            data: msg.data,
-        };
+        self.call(|sess| {
+            let mut raw = ffi::tt_message_t {
+                code: msg.code,
+                data: msg.data,
+            };
 
-        // SAFETY: `self.0` is an open device and `raw` is a valid
-        // `tt_message_t`.
-        err::check(unsafe { ffi::tt_message(self.as_ptr(), &raw mut raw, wait, timeout) })?;
+            // SAFETY: `sess` is an open device and `raw` is a valid
+            // `tt_message_t`.
+            err::check(unsafe { ffi::tt_message(sess.as_ptr(), &raw mut raw, wait, timeout) })?;
 
-        Ok(Message {
-            code: raw.code,
-            data: raw.data,
+            Ok(Message {
+                code: raw.code,
+                data: raw.data,
+            })
         })
     }
 }

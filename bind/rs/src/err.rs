@@ -17,6 +17,11 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub struct Error(pub(crate) io::Error);
 
 impl Error {
+    /// Returns whether the error reports a reset device connection.
+    pub(crate) fn is_lost(&self) -> bool {
+        self.kind() == io::ErrorKind::ConnectionReset
+    }
+
     /// Returns an error representing the last `tt-dal` error which occurred.
     ///
     /// This function reads the thread-local `errno`. This should be called

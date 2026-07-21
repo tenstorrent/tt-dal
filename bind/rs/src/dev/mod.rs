@@ -7,6 +7,7 @@ pub mod reset;
 pub mod telem;
 pub mod tlb;
 
+use std::cell::Cell;
 use std::ffi::CString;
 use std::io;
 use std::mem::MaybeUninit;
@@ -189,7 +190,15 @@ impl Device {
 ///
 /// [`open()`]: Self::open
 #[derive(Debug)]
-pub struct Session(ffi::tt_session_t);
+pub struct Session {
+    /// Underlying session handle.
+    ///
+    /// Held in a `Cell` so a persistent session can reopen in place behind
+    /// the shared references taken by device operations.
+    raw: Cell<ffi::tt_session_t>,
+    /// Options the session was opened with, reused on reopen.
+    opts: OpenOptions,
+}
 
 impl Drop for Session {
     fn drop(&mut self) {
@@ -202,24 +211,19 @@ impl Drop for Session {
 
 #[expect(dead_code)]
 impl Session {
-    /// Returns a reference to the underlying session handle.
-    pub(crate) fn as_raw(&self) -> &ffi::tt_session_t {
-        &self.0
-    }
-
-    /// Returns a mutable reference to the underlying session handle.
-    pub(crate) unsafe fn as_raw_mut(&mut self) -> &mut ffi::tt_session_t {
-        &mut self.0
+    /// Returns a copy of the underlying session handle.
+    pub(crate) fn as_raw(&self) -> ffi::tt_session_t {
+        self.raw.get()
     }
 
     /// Returns a const raw pointer to the underlying session handle.
     pub(crate) fn as_ptr(&self) -> *const ffi::tt_session_t {
-        self.as_raw()
+        self.raw.as_ptr()
     }
 
     /// Returns a mutable raw pointer to the underlying session handle.
-    pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::tt_session_t {
-        &raw mut self.0
+    pub(crate) fn as_mut_ptr(&self) -> *mut ffi::tt_session_t {
+        self.raw.as_ptr()
     }
 }
 
@@ -251,6 +255,43 @@ impl Session {
     pub fn options() -> OpenOptions {
         OpenOptions::new()
     }
+
+    /// Runs a device operation, reopening a persistent session when the
+    /// device connection was lost.
+    pub(crate) fn call<T>(&self, mut op: impl FnMut(&Self) -> Result<T>) -> Result<T> {
+        /// Reopen attempts before a persistent session gives up.
+        const RETRIES: u32 = 3;
+
+        let mut res = op(self);
+        if self.opts.persist {
+            for _ in 0..RETRIES {
+                if !res.as_ref().is_err_and(Error::is_lost) {
+                    return res;
+                }
+                self.reopen()?;
+                res = op(self);
+            }
+            if res.as_ref().is_err_and(Error::is_lost) {
+                // The connection keeps resetting, so report the device as
+                // unusable rather than inviting another retry.
+                return Err(Error(io::Error::from_raw_os_error(libc::ENODEV)));
+            }
+        }
+        res
+    }
+
+    /// Reopens the session in place with its original options.
+    fn reopen(&self) -> Result<()> {
+        let dev = self.dev();
+        // Release the stale descriptor.
+        //
+        // The close may report an error for a descriptor invalidated by an
+        // out-of-band reset, but the kernel frees it regardless.
+        unsafe { ffi::tt_close(self.as_mut_ptr()) };
+        // SAFETY: `dev` is a valid device descriptor and the handle behind
+        // `as_mut_ptr` is a valid out-pointer for `tt_session_t`.
+        err::check(unsafe { ffi::tt_open(dev.as_ptr(), self.as_mut_ptr(), self.opts.flags()) })
+    }
 }
 
 impl Session {
@@ -265,10 +306,10 @@ impl Session {
     ///
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn close(self) -> Result<()> {
-        let mut this = std::mem::ManuallyDrop::new(self);
+        let this = std::mem::ManuallyDrop::new(self);
         // SAFETY: `ManuallyDrop` prevents `Drop` from running, so
         // `tt_close` is called exactly once here.
-        err::check(unsafe { ffi::tt_close(&raw mut this.0) })
+        err::check(unsafe { ffi::tt_close(this.as_mut_ptr()) })
     }
 }
 
@@ -280,7 +321,7 @@ impl Session {
     /// Returns the underlying device descriptor.
     #[must_use]
     pub fn dev(&self) -> Device {
-        Device(self.0.dev)
+        Device(self.raw.get().dev)
     }
 }
 
@@ -298,13 +339,15 @@ impl Session {
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     #[expect(clippy::missing_panics_doc)]
     pub fn info(&self) -> Result<Info> {
-        // SAFETY: `Info` is a C struct, so zero-initializing it is valid.
-        let mut info: Info = unsafe { std::mem::zeroed() };
-        info.output_size_bytes =
-            u32::try_from(std::mem::size_of::<Info>()).expect("info size fits in u32");
-        // SAFETY: `self.0` is an open session and `info` is a valid out-pointer.
-        err::check(unsafe { ffi::tt_dev_info(self.as_ptr(), &raw mut info) })?;
-        Ok(info)
+        self.call(|sess| {
+            // SAFETY: `Info` is a C struct, so zero-initializing it is valid.
+            let mut info: Info = unsafe { std::mem::zeroed() };
+            info.output_size_bytes =
+                u32::try_from(std::mem::size_of::<Info>()).expect("info size fits in u32");
+            // SAFETY: `sess` is an open session and `info` is a valid out-pointer.
+            err::check(unsafe { ffi::tt_dev_info(sess.as_ptr(), &raw mut info) })?;
+            Ok(info)
+        })
     }
 }
 
@@ -320,6 +363,7 @@ impl Session {
 pub struct OpenOptions {
     excl: bool,
     nonblock: bool,
+    persist: bool,
 }
 
 impl OpenOptions {
@@ -351,6 +395,26 @@ impl OpenOptions {
         self
     }
 
+    /// Sets the option for persistent sessions.
+    ///
+    /// This option, when true, transparently reopens the session with its
+    /// original options and retries the failing operation when the device
+    /// connection is lost to an out-of-band reset or removal. A connection
+    /// that keeps resetting is retried a bounded number of times, then
+    /// reported unusable with `ENODEV`. A
+    /// failed reopen surfaces from the operation that triggered it.
+    ///
+    /// The reopen restores only the session handle: TLB allocations do not
+    /// survive it, and requested power state is dropped with the stale
+    /// descriptor. A device that is truly gone surfaces as the reopen's
+    /// `ENODEV`, never as [`ConnectionReset`].
+    ///
+    /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
+    pub fn persistent(&mut self, persist: bool) -> &mut Self {
+        self.persist = persist;
+        self
+    }
+
     /// Opens a session for the device with the options specified by `self`.
     ///
     /// # Errors
@@ -368,7 +432,10 @@ impl OpenOptions {
         // out-pointer for `tt_session_t`.
         err::check(unsafe { ffi::tt_open(&raw const dev.0, raw.as_mut_ptr(), self.flags()) })?;
         // SAFETY: `raw` was fully initialized by the successful call above.
-        Ok(Session(unsafe { raw.assume_init() }))
+        Ok(Session {
+            raw: Cell::new(unsafe { raw.assume_init() }),
+            opts: *self,
+        })
     }
 
     /// Returns the flag bits selected by these options.
@@ -387,7 +454,20 @@ impl OpenOptions {
 
 #[cfg(test)]
 mod tests {
+    use crate::ffi;
     use serial_test::serial;
+
+    #[test]
+    fn options_flags() {
+        let mut opts = super::OpenOptions::new();
+        assert_eq!(opts.flags(), 0);
+        // Persistence is binding-level, so only the other options reach C
+        opts.exclusive(true).nonblocking(true).persistent(true);
+        assert_eq!(
+            u32::from(opts.flags()),
+            ffi::TT_OPEN_EXCL | ffi::TT_OPEN_NONBLOCK
+        );
+    }
 
     #[test]
     #[ignore]
