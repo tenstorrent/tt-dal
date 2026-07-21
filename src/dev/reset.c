@@ -24,22 +24,15 @@ int tt_reset(const tt_device_t *dev) {
 
     // Acquire exclusive access.
     //
-    // Requires KMD >= 2.10: the driver arbitrates access at open time as a
-    // reader/writer lock, `O_EXCL` being the writer. Acquisition succeeds
-    // only when no other client has the device open, so a reset never
-    // destroys another client's session out from under it. `O_NONBLOCK`
-    // fails with `EAGAIN` instead of waiting: a
-    // blocking exclusive open can be starved by a steady stream of plain
-    // opens. Older drivers silently ignore `O_EXCL`, leaving the reset
-    // unfenced.
-    char path[32];
-    snprintf(path, sizeof(path), "/dev/tenstorrent/%u", dev->id);
-    int fd = open(path, O_RDWR | O_CLOEXEC | O_APPEND | O_EXCL | O_NONBLOCK);
-    if (fd < 0)
-        return tt_fail(errno == EAGAIN ? EAGAIN : ENODEV);
-
-    // Wrap in temporary session
-    tt_session_t sess = { .dev = *dev, .fd = fd };
+    // Acquisition succeeds only when no other client has the device open,
+    // so a reset never destroys another client's session out from under
+    // it. Non-blocking, because a blocking exclusive open can be starved
+    // by a steady stream of shared opens. On older drivers `TT_OPEN_EXCL`
+    // is silently ignored, leaving the reset unfenced.
+    tt_session_t sess;
+    if (tt_open(dev, &sess, TT_OPEN_EXCL | TT_OPEN_NONBLOCK) < 0)
+        return TT_ERR;
+    int fd = sess.fd;
 
     // Record BDF.
     //
