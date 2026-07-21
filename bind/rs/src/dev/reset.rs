@@ -12,12 +12,12 @@
 //! the caller cannot use the session after issuing a reset.
 //!
 //! ```no_run
-//! # use ttdal::dev::Device;
+//! # use ttdal::dev::{Device, Session};
 //! #
 //! # let dev = Device::scan().unwrap().next().unwrap();
 //! #
 //! // Open a device session
-//! let sess = dev.open()?;
+//! let sess = Session::open(dev)?;
 //!
 //! // Reset the device, consuming the session and returning a descriptor
 //! let dev = sess.reset()?;

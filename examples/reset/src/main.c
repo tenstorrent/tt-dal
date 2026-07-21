@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
 
         // Verify device is accessible after reset
         tt_session_t sess;
-        if (tt_open(&devs[i], &sess) < 0) {
+        if (tt_open(&devs[i], &sess, 0) < 0) {
             fprintf(
                 stderr,
                 "%s: error: device %u: post-reset open failed: %s\n",

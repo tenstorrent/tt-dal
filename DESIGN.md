@@ -171,7 +171,7 @@ return tt_fail(EINVAL);
 **Error checking pattern**:
 ```c
 // Check for failure, then inspect errno
-if (tt_open(&dev, &sess) < 0) {
+if (tt_open(&dev, &sess, 0) < 0) {
     fprintf(stderr, "Open failed: %s\n", strerror(errno));
 }
 ```
@@ -214,7 +214,7 @@ open a session.
 ```c
 tt_device_t dev = { .id = 0 };
 tt_session_t sess;
-if (tt_open(&dev, &sess) < 0) {
+if (tt_open(&dev, &sess, 0) < 0) {
     // Handle error
 }
 
@@ -338,6 +338,20 @@ and refusal is loud. Force and blocking variants may be added later as
 explicit opt-ins.
 
 ### API Design
+
+#### Session Open Flags
+
+**TL;DR**: `tt_open()` takes a flags bitmask mirroring `open(2)`. There are
+no variant functions.
+
+`tt_open()` mirrors `open(2)`: one function, with behavior selected by a
+flags bitmask. No flags are currently defined, so the plain open is just
+`flags == 0`.
+
+- Flag values are library-owned bits. The platform's numeric values never
+  enter the ABI.
+- Unknown bits fail with `EINVAL`, so a future flag cannot silently no-op on
+  an older library.
 
 #### Power Management
 

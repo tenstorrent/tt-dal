@@ -100,7 +100,7 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev) {
     ssize_t count = tt_dev_scan(sizeof(devs) / sizeof(devs[0]), devs);
     for (ssize_t i = 0; i < count; i++) {
         tt_session_t sess;
-        if (tt_open(&devs[i], &sess) < 0)
+        if (tt_open(&devs[i], &sess, 0) < 0)
             continue;
         tt_dev_info_t info;
         int res = tt_dev_info(&sess, &info);
@@ -169,9 +169,15 @@ ssize_t tt_dev_scan(size_t cap, tt_device_t buf[static cap]) {
 /// Opens `/dev/tenstorrent/<id>` and initializes the session.
 ///
 /// Uses `O_APPEND` to signal a power-aware client to the kernel driver.
-int tt_open(const tt_device_t *dev, tt_session_t *sess) {
+int tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags) {
     // Validate args
     if (!dev || !sess)
+        return tt_fail(EINVAL);
+
+    // Reject unknown flags.
+    //
+    // No flags are currently defined.
+    if (flags != 0)
         return tt_fail(EINVAL);
 
     // Build path

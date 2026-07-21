@@ -197,7 +197,7 @@ int main(int argc, char *argv[]) {
         e->dev     = (tt_device_t){ .id = devs[i].id };
 
         tt_session_t sess;
-        if (tt_open(&e->dev, &sess) < 0) {
+        if (tt_open(&e->dev, &sess, 0) < 0) {
             fprintf(
                 stderr,
                 "%s: error: device %u: failed to open: %s\n",

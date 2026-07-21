@@ -15,11 +15,11 @@ int main(void) {
 
     // Reset via a session must succeed and consume the session
     tt_session_t sess;
-    assert(tt_open(&dev, &sess) == 0);
+    assert(tt_open(&dev, &sess, 0) == 0);
     assert(tt_reset_with(&sess) == 0);
     assert(sess.fd == -1);
 
     // Device must be usable after reset
-    assert(tt_open(&sess.dev, &sess) == 0);
+    assert(tt_open(&sess.dev, &sess, 0) == 0);
     assert(tt_close(&sess) == 0);
 }

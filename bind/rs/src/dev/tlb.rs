@@ -18,12 +18,12 @@
 //! [`Tlb::bind()`], then read or write through the resulting [`Window`].
 //!
 //! ```no_run
-//! # use ttdal::dev::{Device, tlb::{Caching, Config, Size}};
+//! # use ttdal::dev::{Device, Session, tlb::{Caching, Config, Size}};
 //! #
 //! # let dev = Device::scan().unwrap().next().unwrap();
 //! #
 //! // Open a device session
-//! let con = dev.open()?;
+//! let con = Session::open(dev)?;
 //!
 //! // Allocate and bind a TLB window
 //! let mut tlb = con.alloc(Size::Mb2, Caching::WriteCombined)?;

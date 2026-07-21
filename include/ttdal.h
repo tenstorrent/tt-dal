@@ -245,7 +245,7 @@ typedef struct tt_session {
 ///     // Handle error
 /// }
 /// tt_session_t sess;
-/// tt_open(&dev, &sess);
+/// tt_open(&dev, &sess, 0);
 /// // ... use session ...
 /// tt_close(&sess);
 /// ```
@@ -277,7 +277,7 @@ int tt_dev_from_path(const char *path, tt_device_t *dev);
 ///     // Handle error
 /// }
 /// tt_session_t sess;
-/// tt_open(&dev, &sess);
+/// tt_open(&dev, &sess, 0);
 /// // ... use session ...
 /// tt_close(&sess);
 /// ```
@@ -313,7 +313,7 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev);
 /// size_t actual = (count < 16) ? count : 16;
 /// for (size_t i = 0; i < actual; i++) {
 ///     tt_session_t sess;
-///     tt_open(&devs[i], &sess);
+///     tt_open(&devs[i], &sess, 0);
 ///     // ... use session ...
 ///     tt_close(&sess);
 /// }
@@ -327,15 +327,19 @@ ssize_t tt_dev_scan(size_t cap, tt_device_t buf[static cap]);
 /// during `tt_reset()` or a flash sequence). The session struct is reusable:
 /// it may be reopened after `tt_close()`.
 ///
+/// No flags are currently defined, so pass `0`.
+///
 /// @param dev       Device descriptor.
 /// @param[out] sess Session handle to initialize.
+/// @param flags     Open flags.
 /// @return          0 on success, -1 on error (check `errno`).
 ///
 /// @par Errors
 ///
-/// * `EINVAL`     `dev` or `sess` is `NULL`.
+/// * `EINVAL`     `dev` or `sess` is `NULL`, or `flags` contains unknown
+///                bits.
 /// * `ENODEV`     The device could not be opened.
-int tt_open(const tt_device_t *dev, tt_session_t *sess);
+int tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags);
 
 /// Close a session handle.
 ///
@@ -925,11 +929,11 @@ int tt_reset(const tt_device_t *dev);
 ///
 /// ```c
 /// tt_session_t sess;
-/// if (tt_open(&dev, &sess) < 0)
+/// if (tt_open(&dev, &sess, 0) < 0)
 ///     return -1;
 /// if (tt_reset_with(&sess) < 0)
 ///     return -1;  // Session already consumed
-/// tt_open(&sess.dev, &sess);
+/// tt_open(&sess.dev, &sess, 0);
 /// // ... use fresh session ...
 /// tt_close(&sess);
 /// ```
