@@ -807,6 +807,7 @@ typedef uint32_t tt_telemetry_t[TT_TELEMETRY_LEN];
 ///
 /// * `EINVAL`     `sess` or `table` is `NULL`.
 /// * `ENOTCONN`   The session is not open.
+/// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
 /// * `EIO`        Telemetry data was malformed or could not be read.
 /// * `ENOTSUP`    The device architecture is unsupported.
 ///

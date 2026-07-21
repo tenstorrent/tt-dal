@@ -200,6 +200,8 @@ impl Session {
     /// Raises `TTError` with:
     ///
     /// - `ENOTCONN` if the session has been closed.
+    /// - `ECONNRESET` if the session was severed by an out-of-band device
+    ///   reset or removal.
     /// - `EIO` if the telemetry data is malformed or cannot be read.
     /// - `ENOTSUP` if the device architecture is unsupported.
     ///
