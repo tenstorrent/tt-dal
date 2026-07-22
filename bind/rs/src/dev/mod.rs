@@ -1,9 +1,9 @@
 //! Tenstorrent devices.
 
 use crate::ffi;
-pub mod arc;
 pub mod power;
 pub mod reset;
+pub mod smc;
 pub mod telem;
 pub mod tlb;
 

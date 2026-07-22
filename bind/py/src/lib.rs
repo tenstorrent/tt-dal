@@ -3,7 +3,7 @@
 //! `tt-dal` provides low-level, stateless access to Tenstorrent device
 //! hardware through the kernel-mode driver ([KMD][tt-kmd]). It provides raw
 //! hardware primitives through an unopinionated device model to support
-//! operations such as discovery, memory-mapped I/O via TLB windows, ARC
+//! operations such as discovery, memory-mapped I/O via TLB windows, SMC
 //! messaging, telemetry, and reset operations. Higher-level libraries should
 //! build on this library for application-level device management.
 //!
@@ -60,13 +60,13 @@ fn ttdal(m: &Bound<'_, PyModule>) -> PyResult<()> {
         .getattr("modules")?
         .set_item("ttdal.power", power)?;
 
-    // arc submodule
-    let arc = PyModule::new(py, "arc")?;
-    arc.add_class::<dev::arc::Message>()?;
-    m.add_submodule(&arc)?;
+    // smc submodule
+    let smc = PyModule::new(py, "smc")?;
+    smc.add_class::<dev::smc::Message>()?;
+    m.add_submodule(&smc)?;
     py.import("sys")?
         .getattr("modules")?
-        .set_item("ttdal.arc", arc)?;
+        .set_item("ttdal.smc", smc)?;
 
     // telem submodule
     let telem = PyModule::new(py, "telem")?;

@@ -590,10 +590,11 @@ int tt_tlb_free(const tt_session_t *sess, tt_tlb_t *tlb);
 /*============================================================================*
  * MESSAGING                                                                  *
  *                                                                            *
- * ARC is the embedded controller managing firmware, power, and clocks.       *
+ * The System Management Controller (SMC) is the embedded controller          *
+ * managing firmware, power, and clocks.                                      *
  *============================================================================*/
 
-/// ARC message.
+/// SMC message.
 typedef struct tt_message {
     /// Message code.
     uint8_t code;
@@ -601,13 +602,13 @@ typedef struct tt_message {
     uint32_t data[8];
 } tt_message_t;
 
-/// Send a message to ARC.
+/// Send a message to SMC.
 ///
-/// @warning ARC messaging is unimplemented. Past its argument guards, this
+/// @warning SMC messaging is unimplemented. Past its argument guards, this
 /// function aborts the process.
 ///
 /// @param sess           Session handle.
-/// @param[in,out] msg    ARC message body.
+/// @param[in,out] msg    SMC message body.
 /// @param wait           Wait for completion.
 /// @param timeout        Timeout in milliseconds (`0` for default 1000ms).
 /// @return               0 on success, -1 on error (check `errno`).
@@ -660,8 +661,8 @@ typedef enum tt_telemetry_tag {
     TT_TAG_AICLK                = 14,
     /// AXI clock frequency in megahertz.
     TT_TAG_AXICLK               = 15,
-    /// ARC clock frequency in megahertz.
-    TT_TAG_ARCCLK               = 16,
+    /// SMC clock frequency in megahertz.
+    TT_TAG_SMCCLK               = 16,
     /// L2CPU clock 0 frequency in megahertz.
     TT_TAG_L2CPUCLK0            = 17,
     /// L2CPU clock 1 frequency in megahertz.

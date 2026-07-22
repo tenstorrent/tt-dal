@@ -49,7 +49,7 @@ pub enum Tag {
     BoardTemperature = ffi::TT_TAG_BOARD_TEMPERATURE,
     AiClk = ffi::TT_TAG_AICLK,
     AxiClk = ffi::TT_TAG_AXICLK,
-    ArcClk = ffi::TT_TAG_ARCCLK,
+    SmcClk = ffi::TT_TAG_SMCCLK,
     L2CpuClk0 = ffi::TT_TAG_L2CPUCLK0,
     L2CpuClk1 = ffi::TT_TAG_L2CPUCLK1,
     L2CpuClk2 = ffi::TT_TAG_L2CPUCLK2,

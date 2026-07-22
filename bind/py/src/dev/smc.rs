@@ -1,23 +1,24 @@
-//! ARC controller.
+//! System Management Controller.
 //!
-//! The ARC is an on-chip firmware controller responsible for power management,
-//! clock configuration, and other low-level device operations. Communication
-//! with ARC uses a `Message`-based request-response interface.
+//! The System Management Controller (SMC) is an on-chip firmware controller
+//! responsible for power management, clock configuration, and other
+//! low-level device operations. Communication with the SMC uses a
+//! `Message`-based request-response interface.
 
 use crate::ffi;
 use pyo3::prelude::*;
 
-/// An ARC controller message.
+/// An SMC controller message.
 ///
-/// Contains a message code (first byte of `data[0]`) and up to 8 u32 data
-/// words. The response is returned in-place by `Session.message()`.
+/// Contains a message code and up to 8 u32 data words. `Session.message()`
+/// returns the response as a new `Message`.
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct Message(pub(crate) ffi::tt_message_t);
 
 #[pymethods]
 impl Message {
-    /// Creates an ARC message with the given code and data words.
+    /// Creates an SMC message with the given code and data words.
     ///
     /// Raises `ValueError` if `data` has more than 8 elements.
     #[new]
@@ -79,13 +80,13 @@ use super::Session;
 
 #[pymethods]
 impl Session {
-    /// Sends a message to the ARC controller and returns the response.
+    /// Sends a message to the SMC controller and returns the response.
     ///
     /// Set `wait` to block until the controller responds. `timeout` of `None`
     /// uses the driver default.
     ///
     /// Raises `TTError` with `ENOTCONN` if the session has been closed.
-    /// ARC messaging is otherwise not yet implemented, so the underlying
+    /// SMC messaging is otherwise not yet implemented, so the underlying
     /// call aborts before returning.
     #[pyo3(signature = (msg, wait=true, timeout=None))]
     pub fn message(&mut self, msg: Message, wait: bool, timeout: Option<u32>) -> PyResult<Message> {

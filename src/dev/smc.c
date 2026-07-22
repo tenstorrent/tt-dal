@@ -6,7 +6,7 @@
 
 #include <stdlib.h>
 
-/// Send ARC message to device.
+/// Send SMC message to device.
 ///
 /// Dispatches to architecture-specific implementation based on device
 /// architecture.
