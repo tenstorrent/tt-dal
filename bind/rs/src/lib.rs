@@ -3,7 +3,7 @@
 //! `tt-dal` provides low-level, stateless access to Tenstorrent device
 //! hardware through the kernel-mode driver ([KMD][tt-kmd]). It provides raw
 //! hardware primitives through an unopinionated device model to support
-//! operations such as discovery, memory-mapped I/O via TLB windows, ARC
+//! operations such as discovery, memory-mapped I/O via TLB windows, SMC
 //! messaging, telemetry, and reset operations. Higher-level libraries should
 //! build on this library for application-level device management.
 //!

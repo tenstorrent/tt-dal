@@ -8,22 +8,22 @@
 #include <stdint.h>
 #include <string.h>
 
-// ARC address space
+// SMC address space
 #define CSM_BASE 0x10000000U   // core shared memory base address
 #define CSM_SIZE 0x00080000U   // core shared memory size (512 KiB)
-#define RESET_BASE 0x80030000U // ARC APB reset unit base address
+#define RESET_BASE 0x80030000U // SMC APB reset unit base address
 
 // Wormhole
 #define WH_TELEM_TAGS (RESET_BASE + 0x1D0U) // NOC_NODEID_X_0
 #define WH_TELEM_DATA (RESET_BASE + 0x1D4U) // NOC_NODEID_Y_0
-#define WH_ARC_NOC_X 0
-#define WH_ARC_NOC_Y 2
+#define WH_SMC_NOC_X 0
+#define WH_SMC_NOC_Y 2
 
 // Blackhole
 #define BH_TELEM_TAGS (RESET_BASE + 0x434U) // RESET_SCRATCH(13)
 #define BH_TELEM_DATA (RESET_BASE + 0x430U) // RESET_SCRATCH(12)
-#define BH_ARC_NOC_X 8
-#define BH_ARC_NOC_Y 0
+#define BH_SMC_NOC_X 8
+#define BH_SMC_NOC_Y 0
 
 // Limits
 #define TELEM_ENTRY_CAP 128U
@@ -54,14 +54,14 @@ int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table) {
         case TT_ARCH_WORMHOLE:
             telem_tags = WH_TELEM_TAGS;
             telem_data = WH_TELEM_DATA;
-            noc_x      = WH_ARC_NOC_X;
-            noc_y      = WH_ARC_NOC_Y;
+            noc_x      = WH_SMC_NOC_X;
+            noc_y      = WH_SMC_NOC_Y;
             break;
         case TT_ARCH_BLACKHOLE:
             telem_tags = BH_TELEM_TAGS;
             telem_data = BH_TELEM_DATA;
-            noc_x      = BH_ARC_NOC_X;
-            noc_y      = BH_ARC_NOC_Y;
+            noc_x      = BH_SMC_NOC_X;
+            noc_y      = BH_SMC_NOC_Y;
             break;
         default:
             return tt_fail(ENOTSUP);
