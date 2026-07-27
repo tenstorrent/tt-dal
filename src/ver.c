@@ -40,7 +40,7 @@ int tt_version_driver(tt_version_t *version) {
     };
     int res = ioctl(sess.fd, TENSTORRENT_IOCTL_GET_DRIVER_INFO, &query);
     int err = errno; // saved before `tt_close` can clobber it
-    tt_close(&sess);
+    (void)tt_close(&sess);
     if (res != 0)
         return tt_fail_io(err);
 

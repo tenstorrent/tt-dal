@@ -15,6 +15,6 @@ int main(void) {
     // ptr must remain NULL until configured
     assert(tlb.ptr == NULL);
     assert(tlb.len == TT_TLB_2MB);
-    tt_tlb_free(sess, &tlb);
-    tt_close(sess);
+    assert(tt_tlb_free(sess, &tlb) == 0);
+    assert(tt_close(sess) == 0);
 }

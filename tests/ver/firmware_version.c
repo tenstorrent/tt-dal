@@ -15,5 +15,5 @@ int main(void) {
     // Firmware version should be at least 19.x
     if (rc == 0)
         assert(ver.major >= 19);
-    tt_close(sess);
+    assert(tt_close(sess) == 0);
 }

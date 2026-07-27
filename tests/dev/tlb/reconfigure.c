@@ -21,6 +21,6 @@ int main(void) {
     assert(tlb.ptr != NULL);
     assert(tlb.ptr != old_ptr);
 
-    tt_tlb_free(sess, &tlb);
-    tt_close(sess);
+    assert(tt_tlb_free(sess, &tlb) == 0);
+    assert(tt_close(sess) == 0);
 }

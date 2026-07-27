@@ -16,5 +16,5 @@ int main(void) {
     int rc = tt_power(sess, TT_POWER_TENSIX_ENABLE);
     if (rc < 0)
         printf("tensix_enable failed: errno=%d\n", errno);
-    tt_close(sess);
+    assert(tt_close(sess) == 0);
 }

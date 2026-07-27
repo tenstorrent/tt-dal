@@ -12,5 +12,5 @@ int main(void) {
         return EXIT_FAILURE;
     // Successful open must produce a valid file descriptor
     assert(sess->fd >= 0);
-    tt_close(sess);
+    assert(tt_close(sess) == 0);
 }

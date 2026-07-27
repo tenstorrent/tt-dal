@@ -14,5 +14,5 @@ int main(void) {
     assert(tt_dev_info(sess, &info) == 0);
     // Tenstorrent PCI vendor ID is 0x1e52
     assert(info.vendor_id != 0);
-    tt_close(sess);
+    assert(tt_close(sess) == 0);
 }

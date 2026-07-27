@@ -64,7 +64,7 @@ cleanup:
     // Free the newly allocated TLB, preserving the failure cause across
     // the cleanup.
     int err = errno;
-    tt_tlb_free(sess, tlb);
+    (void)tt_tlb_free(sess, tlb);
     return tt_fail(err);
 }
 
