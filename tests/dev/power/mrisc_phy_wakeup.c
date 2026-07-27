@@ -16,5 +16,5 @@ int main(void) {
     int rc = tt_power(sess, TT_POWER_MRISC_PHY_WAKEUP);
     if (rc < 0)
         printf("mrisc_phy_wakeup failed: errno=%d\n", errno);
-    tt_close(sess);
+    assert(tt_close(sess) == 0);
 }

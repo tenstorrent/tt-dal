@@ -43,6 +43,7 @@ for detailed philosophy and design decisions.
 
 ### Prerequisites
 
+- C23 toolchain (or C++17 for C++ consumers of the header)
 - [tt-kmd] kernel driver (version 2.10+) must be installed and loaded
 - CMake 3.21+
 

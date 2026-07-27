@@ -16,5 +16,5 @@ int main(void) {
     assert(table[TT_TAG_TIMER_HEARTBEAT] != 0);
     assert(table[TT_TAG_AICLK] > 0);
 
-    tt_close(sess);
+    assert(tt_close(sess) == 0);
 }

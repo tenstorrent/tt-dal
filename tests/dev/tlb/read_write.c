@@ -26,6 +26,6 @@ int main(void) {
     memcpy(&val_read2, tlb.ptr, sizeof(val_read2));
     assert(val_read1 == val_read2);
 
-    tt_tlb_free(sess, &tlb);
-    tt_close(sess);
+    assert(tt_tlb_free(sess, &tlb) == 0);
+    assert(tt_close(sess) == 0);
 }

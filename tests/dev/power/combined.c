@@ -16,5 +16,5 @@ int main(void) {
     int rc = tt_power(sess, 0x000F);
     if (rc < 0)
         printf("combined (0x000F) failed: errno=%d\n", errno);
-    tt_close(sess);
+    assert(tt_close(sess) == 0);
 }

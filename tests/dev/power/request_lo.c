@@ -16,5 +16,5 @@ int main(void) {
     int rc = tt_power(sess, 0x0000);
     if (rc < 0)
         printf("request_lo failed: errno=%d\n", errno);
-    tt_close(sess);
+    assert(tt_close(sess) == 0);
 }

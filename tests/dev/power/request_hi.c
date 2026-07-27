@@ -16,5 +16,5 @@ int main(void) {
     int rc = tt_power(sess, 0xFFFF);
     if (rc < 0)
         printf("request_hi failed: errno=%d\n", errno);
-    tt_close(sess);
+    assert(tt_close(sess) == 0);
 }

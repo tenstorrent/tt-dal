@@ -104,7 +104,7 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev) {
             continue;
         tt_dev_info_t info;
         int res = tt_dev_info(&sess, &info);
-        tt_close(&sess);
+        (void)tt_close(&sess);
         if (res < 0)
             continue;
 

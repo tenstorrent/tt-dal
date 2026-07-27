@@ -8,6 +8,9 @@
  * Tenstorrent accelerator hardware. It is designed to be consumed by
  * higher-level libraries.
  *
+ * The header uses C23 attributes, so consumers need C23 (or C++17 for C++
+ * consumers).
+ *
  * @version 0.1.0
  * @copyright Copyright (c) 2026 Tenstorrent Inc.
  */
@@ -57,7 +60,7 @@ typedef struct tt_version {
 /// Use this to verify ABI compatibility.
 ///
 /// @return  Library version.
-static inline tt_version_t tt_version_dal(void) {
+[[nodiscard]] static inline tt_version_t tt_version_dal(void) {
     return (tt_version_t){
         .major = TT_VERSION_MAJOR,
         .minor = TT_VERSION_MINOR,
@@ -82,7 +85,7 @@ static inline tt_version_t tt_version_dal(void) {
 /// * `ECONNRESET` The device was reset or removed out-of-band.
 ///
 /// Other codes propagate from the failing system call.
-int tt_version_driver(tt_version_t *version);
+[[nodiscard]] int tt_version_driver(tt_version_t *version);
 
 /// Get the device firmware version.
 ///
@@ -100,7 +103,8 @@ int tt_version_driver(tt_version_t *version);
 /// * `EIO`        The version string was empty or malformed.
 ///
 /// Other codes propagate from the failing system call.
-int tt_version_firmware(const tt_session_t *sess, tt_version_t *version);
+[[nodiscard]] int
+tt_version_firmware(const tt_session_t *sess, tt_version_t *version);
 
 /*============================================================================*
  * ERRORS                                                                     *
@@ -166,7 +170,7 @@ typedef enum tt_arch {
 ///
 /// @param arch  Architecture variant.
 /// @return      Architecture string, or `NULL` if invalid.
-static inline const char *tt_arch_describe(tt_arch_t arch) {
+[[nodiscard]] static inline const char *tt_arch_describe(tt_arch_t arch) {
     switch (arch) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
@@ -249,7 +253,7 @@ typedef struct tt_session {
 /// // ... use session ...
 /// tt_close(&sess);
 /// ```
-int tt_dev_from_path(const char *path, tt_device_t *dev);
+[[nodiscard]] int tt_dev_from_path(const char *path, tt_device_t *dev);
 
 /// Create device from a PCIe bus/device/function (BDF) address.
 ///
@@ -281,7 +285,7 @@ int tt_dev_from_path(const char *path, tt_device_t *dev);
 /// // ... use session ...
 /// tt_close(&sess);
 /// ```
-int tt_dev_from_bdf(const char *addr, tt_device_t *dev);
+[[nodiscard]] int tt_dev_from_bdf(const char *addr, tt_device_t *dev);
 
 /// Discover connected devices.
 ///
@@ -318,7 +322,7 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev);
 ///     tt_close(&sess);
 /// }
 /// ```
-ssize_t tt_dev_scan(size_t cap, tt_device_t buf[static cap]);
+[[nodiscard]] ssize_t tt_dev_scan(size_t cap, tt_device_t buf[static cap]);
 
 /// Session open flags.
 ///
@@ -361,7 +365,8 @@ typedef enum tt_open_flag {
 /// * `ENODEV`     The device could not be opened.
 /// * `EAGAIN`     `TT_OPEN_NONBLOCK` is set and another client holds the
 ///                device incompatibly.
-int tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags);
+[[nodiscard]] int
+tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags);
 
 /// Close a session handle.
 ///
@@ -377,7 +382,7 @@ int tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags);
 /// * `EINVAL`     `sess` is `NULL`.
 ///
 /// Other codes propagate from the failing system call.
-int tt_close(tt_session_t *sess);
+[[nodiscard]] int tt_close(tt_session_t *sess);
 
 /// Device information.
 ///
@@ -417,7 +422,7 @@ typedef struct tt_dev_info {
 /// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
 ///
 /// Other codes propagate from the failing system call.
-int tt_dev_info(const tt_session_t *sess, tt_dev_info_t *info);
+[[nodiscard]] int tt_dev_info(const tt_session_t *sess, tt_dev_info_t *info);
 
 /*============================================================================*
  * ADDRESSING                                                                 *
@@ -532,7 +537,7 @@ typedef struct tt_tlb_config {
 /// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
 ///
 /// Other codes propagate from the failing system call.
-int tt_tlb_alloc(
+[[nodiscard]] int tt_tlb_alloc(
     const tt_session_t *sess,
     tt_tlb_size_t size,
     tt_tlb_cache_mode_t mode,
@@ -564,7 +569,7 @@ int tt_tlb_alloc(
 /// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
 ///
 /// Other codes propagate from the failing system call.
-int tt_tlb_bind(
+[[nodiscard]] int tt_tlb_bind(
     const tt_session_t *sess, tt_tlb_t *tlb, const tt_tlb_config_t *cfg
 );
 
@@ -585,7 +590,7 @@ int tt_tlb_bind(
 /// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
 ///
 /// Other codes propagate from the failing system call.
-int tt_tlb_free(const tt_session_t *sess, tt_tlb_t *tlb);
+[[nodiscard]] int tt_tlb_free(const tt_session_t *sess, tt_tlb_t *tlb);
 
 /*============================================================================*
  * MESSAGING                                                                  *
@@ -617,7 +622,7 @@ typedef struct tt_message {
 ///
 /// * `EINVAL`     `sess` or `msg` is `NULL`.
 /// * `ENOTCONN`   The session is not open.
-int tt_message(
+[[nodiscard]] int tt_message(
     const tt_session_t *sess, tt_message_t *msg, bool wait, uint32_t timeout
 );
 
@@ -813,7 +818,7 @@ typedef uint32_t tt_telemetry_t[TT_TELEMETRY_LEN];
 /// * `ENOTSUP`    The device architecture is unsupported.
 ///
 /// Other codes propagate from the failing system call.
-int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table);
+[[nodiscard]] int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table);
 
 /*============================================================================*
  * POWER                                                                      *
@@ -882,7 +887,7 @@ typedef enum tt_power_flag {
 /// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
 ///
 /// Other codes propagate from the failing system call.
-int tt_power(const tt_session_t *sess, uint16_t flags);
+[[nodiscard]] int tt_power(const tt_session_t *sess, uint16_t flags);
 
 /*============================================================================*
  * RESET                                                                      *
@@ -921,7 +926,7 @@ int tt_power(const tt_session_t *sess, uint16_t flags);
 /// * `ETIMEDOUT`  The reset did not complete in time.
 ///
 /// Other codes propagate from the failing system call.
-int tt_reset(const tt_device_t *dev);
+[[nodiscard]] int tt_reset(const tt_device_t *dev);
 
 /// Trigger device reset via an open session.
 ///
@@ -961,7 +966,7 @@ int tt_reset(const tt_device_t *dev);
 /// // ... use fresh session ...
 /// tt_close(&sess);
 /// ```
-int tt_reset_with(tt_session_t *sess);
+[[nodiscard]] int tt_reset_with(tt_session_t *sess);
 
 #ifdef __cplusplus
 }

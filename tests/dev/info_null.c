@@ -14,5 +14,5 @@ int main(void) {
     // NULL info pointer must be rejected even on an open session
     assert(tt_dev_info(sess, NULL) < 0);
     assert(errno == EINVAL);
-    tt_close(sess);
+    assert(tt_close(sess) == 0);
 }

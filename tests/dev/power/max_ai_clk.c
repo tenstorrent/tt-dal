@@ -16,5 +16,5 @@ int main(void) {
     int rc = tt_power(sess, TT_POWER_MAX_AI_CLK);
     if (rc < 0)
         printf("max_ai_clk failed: errno=%d\n", errno);
-    tt_close(sess);
+    assert(tt_close(sess) == 0);
 }

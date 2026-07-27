@@ -188,6 +188,21 @@ if (tt_open(&dev, &sess, 0) < 0) {
 }
 ```
 
+#### Unused Results
+
+**TL;DR**: Every status return is `[[nodiscard]]`. Deliberate discards cast
+to `void`.
+
+Every function whose return value carries information is annotated
+`[[nodiscard]]`, so a discarded status is a compiler warning instead of a
+silent bug. This follows the fail-loudly principle: forgetting to check
+`tt_open()` cannot slip through a build. Where discarding is deliberate
+(cleanup paths that must preserve an earlier `errno`), the call is cast to
+`void` to record the intent.
+
+The attribute requires C23, which the library already targets, and C++17
+for C++ consumers of the header.
+
 ### Safety & Correctness
 
 #### Memory Management

@@ -145,14 +145,14 @@ int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table) {
     if (snapshot(tags, data, table) != 0)
         goto cleanup;
     tt_trap_disarm();
-    tt_tlb_free(sess, &tlb);
+    (void)tt_tlb_free(sess, &tlb);
     return TT_OK;
 
 cleanup:
     // Preserve the failure cause across the cleanup
     int err = errno;
     tt_trap_disarm();
-    tt_tlb_free(sess, &tlb);
+    (void)tt_tlb_free(sess, &tlb);
     return tt_fail(err);
 }
 
