@@ -8,7 +8,7 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libc = "0.2.189"
+libc = { workspace = true }
 pci = { path = "crates/pci" }
 semver = "1.0.27"
 ttdal-sys = { workspace = true }
