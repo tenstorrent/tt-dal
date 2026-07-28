@@ -203,9 +203,28 @@ int tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags) {
         return tt_fail(errno == EAGAIN ? EAGAIN : ENODEV);
 
     // Initialize session
-    *sess = (tt_session_t){ .dev = *dev, .fd = fd };
+    *sess = (tt_session_t){ .dev = *dev, .fd = fd, .flags = flags };
 
     return TT_OK;
+}
+
+/// Reopen a session.
+///
+/// Closes the stale descriptor and reopens the same device with the flags
+/// stored in the session.
+int tt_reopen(tt_session_t *sess) {
+    // Validate args
+    if (!sess)
+        return tt_fail(EINVAL);
+
+    // Release the stale descriptor.
+    //
+    // A descriptor invalidated by an out-of-band reset may fail to close, but
+    // the kernel frees it regardless, so the result is discarded.
+    (void)tt_close(sess);
+
+    // Reopen with the original flags
+    return tt_open(&sess->dev, sess, sess->flags);
 }
 
 /// Close a session.

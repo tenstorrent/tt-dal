@@ -215,7 +215,8 @@ typedef struct tt_device {
 ///
 /// Obtain via `tt_open()`; release via `tt_close()`, or by passing to
 /// `tt_reset_with()`, which consumes the session. A handle is also
-/// invalidated by an out-of-band device reset or removal.
+/// invalidated by an out-of-band device reset or removal, after which
+/// `tt_reopen()` restores it in place.
 typedef struct tt_session {
     /// Device descriptor for this session.
     tt_device_t dev;
@@ -224,6 +225,11 @@ typedef struct tt_session {
     /// Underlying kernel fd used for `ioctl` and `mmap`. `-1` after
     /// `tt_close()` to detect use-after-close.
     int fd;
+    /// Open flags.
+    ///
+    /// Bitmask of `tt_open_flag_t` values the session was opened with,
+    /// reused by `tt_reopen()`.
+    uint16_t flags;
 } tt_session_t;
 
 /// Create device from a path.
@@ -383,6 +389,29 @@ tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags);
 ///
 /// Other codes propagate from the failing system call.
 [[nodiscard]] int tt_close(tt_session_t *sess);
+
+/// Reopen a session in place.
+///
+/// Closes the session's current descriptor, then reopens the same device with
+/// the flags it was opened with. Use this to recover a session severed by an
+/// out-of-band reset: the reopen succeeds after a reset and reports `ENODEV`
+/// after a removal.
+///
+/// The reopen restores only the session handle. TLB allocations do not survive
+/// it, and any requested power state is dropped with the old descriptor. The
+/// stale descriptor is always released, so a failed reopen leaves the session
+/// closed (`sess->fd` is `-1`).
+///
+/// @param sess  Session handle to reopen in place.
+/// @return      0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `sess` is `NULL`.
+/// * `ENODEV`     The device could not be reopened.
+/// * `EAGAIN`     The session was opened with `TT_OPEN_NONBLOCK` and another
+///                client holds the device incompatibly.
+[[nodiscard]] int tt_reopen(tt_session_t *sess);
 
 /// Device information.
 ///

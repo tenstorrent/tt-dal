@@ -61,6 +61,7 @@ typedef struct tt_device {
 typedef struct tt_session {
     tt_device_t dev;   // Device descriptor
     int fd;            // File descriptor (-1 after close)
+    uint16_t flags;    // Open flags, reused by tt_reopen()
 } tt_session_t;
 ```
 

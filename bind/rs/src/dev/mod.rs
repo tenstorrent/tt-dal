@@ -281,16 +281,33 @@ impl Session {
     }
 
     /// Reopens the session in place with its original options.
-    fn reopen(&self) -> Result<()> {
-        let dev = self.dev();
-        // Release the stale descriptor.
-        //
-        // The close may report an error for a descriptor invalidated by an
-        // out-of-band reset, but the kernel frees it regardless.
-        unsafe { ffi::tt_close(self.as_mut_ptr()) };
-        // SAFETY: `dev` is a valid device descriptor and the handle behind
-        // `as_mut_ptr` is a valid out-pointer for `tt_session_t`.
-        err::check(unsafe { ffi::tt_open(dev.as_ptr(), self.as_mut_ptr(), self.opts.flags()) })
+    ///
+    /// Closes the current descriptor and reopens the same device with the
+    /// options this session was opened with. Use this to recover a session
+    /// severed by an out-of-band reset: the reopen succeeds after a reset and
+    /// fails with `ENODEV` after a removal.
+    ///
+    /// The reopen restores only the session handle. TLB allocations do not
+    /// survive it, and any requested power state is dropped with the old
+    /// descriptor. A persistent session (see [`persistent`]) reopens on its
+    /// own, so calling this is only necessary for a session opened without it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WouldBlock`] if the session was opened with [`nonblocking`]
+    /// and another client holds the device incompatibly. Returns `ENODEV`,
+    /// observable via [`Error::raw_os_error()`], if the device could not be
+    /// reopened.
+    ///
+    /// [`persistent`]: OpenOptions::persistent
+    /// [`nonblocking`]: OpenOptions::nonblocking
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
+    /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
+    pub fn reopen(&self) -> Result<()> {
+        // SAFETY: The handle behind `as_mut_ptr` is a valid, initialized
+        // `tt_session_t`. `tt_reopen` closes the stale descriptor and reopens
+        // the same device with the flags stored in the session.
+        err::check(unsafe { ffi::tt_reopen(self.as_mut_ptr()) })
     }
 }
 
@@ -482,6 +499,14 @@ mod tests {
     #[serial]
     fn open_smoke() {
         crate::tests::open();
+    }
+
+    #[test]
+    #[ignore]
+    #[serial]
+    fn reopen_smoke() {
+        let sess = crate::tests::open();
+        sess.reopen().expect("reopen failed");
     }
 
     #[test]
