@@ -131,7 +131,6 @@ impl Device {
         Ok(Session {
             // SAFETY: `raw` was fully initialized by the successful call above.
             raw: unsafe { raw.assume_init() },
-            flags,
             persist: persistent,
         })
     }
@@ -151,8 +150,6 @@ impl Device {
 pub struct Session {
     /// Underlying session handle.
     raw: ffi::tt_session_t,
-    /// Open flags, reused on reopen.
-    flags: u16,
     /// Whether the session reopens on a lost device connection.
     persist: bool,
 }
@@ -199,16 +196,6 @@ impl Session {
         }
         res
     }
-
-    /// Reopens the session in place with its original flags.
-    fn reopen(&mut self) -> PyResult<()> {
-        let dev = self.raw.dev;
-        // Release the stale descriptor.
-        //
-        // The kernel frees it even when close reports an error.
-        unsafe { ffi::tt_close(&raw mut self.raw) };
-        crate::err::check(unsafe { ffi::tt_open(&raw const dev, &raw mut self.raw, self.flags) })
-    }
 }
 
 #[pymethods]
@@ -239,6 +226,29 @@ impl Session {
             crate::err::check(unsafe { ffi::tt_close(&raw mut self.raw) })?;
         }
         Ok(())
+    }
+
+    /// Reopens the session in place with its original flags.
+    ///
+    /// Closes the current descriptor and reopens the same device with the
+    /// options this session was opened with. Use this to recover a session
+    /// severed by an out-of-band reset: the reopen succeeds after a reset and
+    /// raises `ENODEV` after a removal.
+    ///
+    /// The reopen restores only the session handle. TLB allocations do not
+    /// survive it, and any requested power state is dropped with the old
+    /// descriptor. A persistent session reopens on its own, so calling this is
+    /// only necessary for a session opened without `persistent`.
+    ///
+    /// Raises `TTError` with:
+    ///
+    /// - `ENODEV` if the device could not be reopened.
+    /// - `EAGAIN` if the session was opened with `nonblocking` and another
+    ///   client holds the device incompatibly.
+    pub fn reopen(&mut self) -> PyResult<()> {
+        // SAFETY: `self.raw` is an initialized session. tt_reopen closes the
+        // stale descriptor and reopens the device with the session's flags.
+        crate::err::check(unsafe { ffi::tt_reopen(&raw mut self.raw) })
     }
 
     /// Returns the underlying device descriptor.
