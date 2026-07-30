@@ -3,7 +3,11 @@ name = "ttdal"
 version = { workspace = true }
 edition = { workspace = true }
 description = { workspace = true }
+readme = "README.md"
+repository = { workspace = true }
 publish = false
+keywords = ["tenstorrent", "accelerator", "hardware", "driver", "ffi"]
+categories = ["hardware-support", "api-bindings"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
