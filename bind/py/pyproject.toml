@@ -4,9 +4,22 @@ build-backend = "maturin"
 
 [project]
 name = "ttdal"
+readme = "README.md"
 requires-python = ">=3.10"
+keywords = ["tenstorrent", "accelerator", "hardware", "driver"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
+    "Topic :: System :: Hardware",
+]
 dependencies = ["semver>=3.0.4"]
 dynamic = ["version", "description", "license"]
+
+[project.urls]
+Repository = "https://github.com/tenstorrent/tt-dal"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
