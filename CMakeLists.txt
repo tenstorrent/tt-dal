@@ -33,15 +33,55 @@ set_target_properties(ttdal PROPERTIES
     C_STANDARD 23
     C_STANDARD_REQUIRED YES
     POSITION_INDEPENDENT_CODE ON
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
 )
 
 # Install
+include(CMakePackageConfigHelpers)
+
 install(TARGETS ttdal
+    EXPORT ttdalTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
 install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# Package
+install(EXPORT ttdalTargets
+    FILE ttdalTargets.cmake
+    NAMESPACE ttdal::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ttdal
+)
+
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ttdalConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/ttdalConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ttdal
+)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/ttdalConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/ttdalConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/ttdalConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ttdal
+)
+
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ttdal.pc.in
+    ${CMAKE_CURRENT_BINARY_DIR}/ttdal.pc
+    @ONLY
+)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ttdal.pc
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
+)
 
 # Tests
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
