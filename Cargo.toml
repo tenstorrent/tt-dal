@@ -10,6 +10,7 @@ members = [
 version = "0.1.0"
 edition = "2024"
 description = "Tenstorrent Device Access Library"
+repository = "https://github.com/tenstorrent/tt-dal"
 
 [workspace.dependencies]
 bindgen = "0.72.1"
