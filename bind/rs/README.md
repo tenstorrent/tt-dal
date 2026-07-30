@@ -19,7 +19,6 @@ The crate is structured as follows:
 ├── Cargo.toml       # cargo manifest
 ├── README.md        # this document
 ├── ...
-├── crates/          # support crates
 ├── src/             # public bindings
 └── sys/             # raw FFI bindings
 ```

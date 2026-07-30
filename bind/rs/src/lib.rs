@@ -13,6 +13,7 @@
 
 pub(crate) use ttdal_sys as ffi;
 pub mod dev;
+pub mod pci;
 pub mod ver;
 
 mod err;

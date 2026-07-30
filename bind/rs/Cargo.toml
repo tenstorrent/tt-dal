@@ -9,7 +9,6 @@ publish = false
 
 [dependencies]
 libc = { workspace = true }
-pci = { path = "crates/pci" }
 semver = "1.0.27"
 ttdal-sys = { workspace = true }
 
