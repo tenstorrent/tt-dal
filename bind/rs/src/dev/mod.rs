@@ -91,7 +91,7 @@ impl TryFrom<&Path> for Device {
     }
 }
 
-impl TryFrom<pci::Address> for Device {
+impl TryFrom<crate::pci::Address> for Device {
     type Error = Error;
 
     /// Constructs a device descriptor for the device at the given PCI address.
@@ -102,7 +102,7 @@ impl TryFrom<pci::Address> for Device {
     /// connected device matches the address.
     ///
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
-    fn try_from(addr: pci::Address) -> Result<Self> {
+    fn try_from(addr: crate::pci::Address) -> Result<Self> {
         let bdf = CString::new(addr.to_string())
             .map_err(|_| Error(io::ErrorKind::InvalidInput.into()))?;
         let mut raw = MaybeUninit::<ffi::tt_device_t>::uninit();

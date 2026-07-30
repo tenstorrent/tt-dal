@@ -1,9 +1,7 @@
 //! PCI address types.
 //!
-//! This crate provides [`Address`], a PCI BDF (Bus/Device/Function) address
+//! This module provides [`Address`], a PCI BDF (Bus/Device/Function) address
 //! type modeled on [`std::net::Ipv4Addr`].
-
-#![warn(clippy::pedantic)]
 
 use std::fmt;
 use std::str::FromStr;
@@ -23,7 +21,7 @@ use std::str::FromStr;
 /// # Examples
 ///
 /// ```
-/// use pci::Address;
+/// use ttdal::pci::Address;
 ///
 /// let addr = Address::new(0, 3, 0, 0);
 /// assert_eq!(addr.to_string(), "0000:03:00.0");

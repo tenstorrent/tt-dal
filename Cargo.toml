@@ -3,7 +3,6 @@ resolver = "2"
 members = [
     "bind/py",
     "bind/rs",
-    "bind/rs/crates/*",
     "bind/rs/sys",
 ]
 
