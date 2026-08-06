@@ -2,6 +2,7 @@
 name = "ttdal-py"
 version = { workspace = true }
 edition = { workspace = true }
+rust-version = { workspace = true }
 description = { workspace = true }
 publish = false
 

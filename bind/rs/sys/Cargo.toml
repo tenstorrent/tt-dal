@@ -2,6 +2,7 @@
 name = "ttdal-sys"
 version = { workspace = true }
 edition = { workspace = true }
+rust-version = { workspace = true }
 description = "FFI bindings to ttdal"
 repository = { workspace = true }
 links = "ttdal"
