@@ -15,7 +15,7 @@ repository = "https://github.com/tenstorrent/tt-dal"
 
 [workspace.dependencies]
 bindgen = "0.72.1"
-cc = "1.2.56"
-cmake = "0.1.57"
+cc = "1.4.0"
+cmake = "0.1.58"
 libc = "0.2.189"
 ttdal-sys = { path = "bind/rs/sys", version = "0.1.0" }

@@ -14,8 +14,8 @@ categories = ["hardware-support", "api-bindings"]
 
 [dependencies]
 libc = { workspace = true }
-semver = "1.0.27"
+semver = "1.0.28"
 ttdal-sys = { workspace = true }
 
 [dev-dependencies]
-serial_test = "3.4.0"
+serial_test = "4.0.1"
