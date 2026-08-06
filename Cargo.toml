@@ -9,6 +9,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.87"
 description = "Tenstorrent Device Access Library"
 repository = "https://github.com/tenstorrent/tt-dal"
 
