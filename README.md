@@ -29,6 +29,28 @@ hidden state. Provided operations selectively use the kernel driver (KMD) or
 directly interact with hardware (e.g. registers). See [DESIGN.md](/DESIGN.md)
 for detailed philosophy and design decisions.
 
+## Stability
+
+`tt-dal` is pre-1.0: the C API, the C ABI, and the language bindings may change
+between releases. Versioning follows [SemVer](https://semver.org), and breaking
+changes are declared through
+[Conventional Commits](https://www.conventionalcommits.org) (a `!` marker or a
+`BREAKING CHANGE:` footer on the commit).
+
+On the path to the first stable release (v1.0.0), automated compatibility
+backstops will guard against unintended breakage:
+
+- **Rust API**: [`cargo-semver-checks`][semver-checks] flags source-level SemVer
+  violations in the crates.
+- **C ABI**: [`abidiff`][libabigail] (libabigail) flags binary-incompatible
+  changes to `libttdal`.
+
+Neither detects semantic (behavior-only) changes; those are declared in the
+commit message.
+
+[semver-checks]: https://github.com/obi1kenobi/cargo-semver-checks
+[libabigail]: https://sourceware.org/libabigail/
+
 ## Features
 
 - Driver and firmware version queries
