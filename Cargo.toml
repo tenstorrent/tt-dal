@@ -1,9 +1,38 @@
+[package]
+name = "ttdal-sys"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+description = "FFI bindings to ttdal"
+repository = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
+links = "ttdal"
+build = "sys/build.rs"
+include = [
+    "/CMakeLists.txt",
+    "/cmake/**",
+    "/include/**",
+    "/src/**",
+    "/sys/**",
+    "/vendor/**",
+]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+path = "sys/src/lib.rs"
+
+[build-dependencies]
+bindgen = { workspace = true }
+cc = { workspace = true }
+cmake = { workspace = true }
+
 [workspace]
 resolver = "2"
 members = [
     "bind/py",
     "bind/rs",
-    "bind/rs/sys",
 ]
 
 [workspace.package]
@@ -12,10 +41,12 @@ edition = "2024"
 rust-version = "1.87"
 description = "Tenstorrent Device Access Library"
 repository = "https://github.com/tenstorrent/tt-dal"
+keywords = ["tenstorrent", "accelerator", "hardware", "driver", "ffi"]
+categories = ["hardware-support", "api-bindings"]
 
 [workspace.dependencies]
 bindgen = "0.72.1"
 cc = "1.4.0"
 cmake = "0.1.58"
 libc = "0.2.189"
-ttdal-sys = { path = "bind/rs/sys", version = "0.1.0" }
+ttdal-sys = { path = ".", version = "0.1.0" }

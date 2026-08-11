@@ -19,8 +19,7 @@ The crate is structured as follows:
 ├── Cargo.toml       # cargo manifest
 ├── README.md        # this document
 ├── ...
-├── src/             # public bindings
-└── sys/             # raw FFI bindings
+└── src/             # public bindings
 ```
 
 ## Building
