@@ -35,11 +35,11 @@ typedef struct tt_session tt_session_t;
  *============================================================================*/
 
 /// Major version definition.
-#define TT_VERSION_MAJOR 0
+#define TTDAL_VERSION_MAJOR 0
 /// Minor version definition.
-#define TT_VERSION_MINOR 1
+#define TTDAL_VERSION_MINOR 1
 /// Patch version definition.
-#define TT_VERSION_PATCH 0
+#define TTDAL_VERSION_PATCH 0
 
 /// Semantic version.
 typedef struct tt_version {
@@ -62,9 +62,9 @@ typedef struct tt_version {
 /// @return  Library version.
 [[nodiscard]] static inline tt_version_t tt_version_dal(void) {
     return (tt_version_t){
-        .major = TT_VERSION_MAJOR,
-        .minor = TT_VERSION_MINOR,
-        .patch = TT_VERSION_PATCH,
+        .major = TTDAL_VERSION_MAJOR,
+        .minor = TTDAL_VERSION_MINOR,
+        .patch = TTDAL_VERSION_PATCH,
     };
 }
 

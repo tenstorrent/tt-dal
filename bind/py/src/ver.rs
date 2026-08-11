@@ -42,9 +42,9 @@ fn raw_to_semver(py: Python<'_>, vers: ffi::tt_version_t) -> PyResult<Py<PyAny>>
 pub fn library(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let s = format!(
         "{}.{}.{}",
-        ffi::TT_VERSION_MAJOR,
-        ffi::TT_VERSION_MINOR,
-        ffi::TT_VERSION_PATCH,
+        ffi::TTDAL_VERSION_MAJOR,
+        ffi::TTDAL_VERSION_MINOR,
+        ffi::TTDAL_VERSION_PATCH,
     );
     py.import("semver")?
         .getattr("Version")?

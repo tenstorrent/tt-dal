@@ -38,9 +38,9 @@ fn from_raw(vers: ffi::tt_version_t) -> Version {
 #[must_use]
 pub const fn library() -> Version {
     Version::new(
-        ffi::TT_VERSION_MAJOR as u64,
-        ffi::TT_VERSION_MINOR as u64,
-        ffi::TT_VERSION_PATCH as u64,
+        ffi::TTDAL_VERSION_MAJOR as u64,
+        ffi::TTDAL_VERSION_MINOR as u64,
+        ffi::TTDAL_VERSION_PATCH as u64,
     )
 }
 
