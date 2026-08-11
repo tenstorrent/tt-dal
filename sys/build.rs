@@ -1,3 +1,25 @@
+use bindgen::callbacks::{IntKind, ParseCallbacks};
+use semver::{Prerelease, Version};
+use std::sync::Mutex;
+
+static VERSION: Mutex<Version> = Mutex::new(Version::new(0, 0, 0));
+
+#[derive(Debug, Default)]
+struct TtdalCallbacks;
+
+impl ParseCallbacks for TtdalCallbacks {
+    fn int_macro(&self, name: &str, value: i64) -> Option<IntKind> {
+        let mut version = VERSION.lock().unwrap();
+        match name {
+            "TTDAL_VERSION_MAJOR" => version.major = value as u64,
+            "TTDAL_VERSION_MINOR" => version.minor = value as u64,
+            "TTDAL_VERSION_PATCH" => version.patch = value as u64,
+            _ => {}
+        }
+        None
+    }
+}
+
 fn main() {
     // Build and install libttdal via the parent CMakeLists.txt.
     let dst = cmake::Config::new(env!("CARGO_MANIFEST_DIR")).build();
@@ -27,6 +49,7 @@ fn main() {
         // header files changed.
         .allowlist_file(".*ttdal\\.h")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+        .parse_callbacks(Box::new(TtdalCallbacks::default()))
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.
@@ -34,6 +57,13 @@ fn main() {
         // Write the bindings to the $OUT_DIR/bindings.rs file.
         .write_to_file(out.join("bindings.rs"))
         .expect("unable to write bindings");
+
+    let ttdal = VERSION.lock().unwrap().clone();
+    let mut cargo = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
+    cargo.pre = Prerelease::EMPTY;
+    if ttdal.cmp_precedence(&cargo).is_ne() {
+        println!("cargo::error=version mismatch (found: {cargo}, expected: {ttdal})");
+    }
 
     // Compile bindgen-generated wrappers for static inline functions.
     cc::Build::new()

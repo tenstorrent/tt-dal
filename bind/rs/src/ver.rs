@@ -92,16 +92,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn library_matches_cargo() {
-        assert_eq!(
-            env!("CARGO_PKG_VERSION")
-                .parse::<Version>()
-                .expect("invalid package version"),
-            library(),
-        );
-    }
-
-    #[test]
     #[ignore]
     #[serial]
     fn driver_version() {

@@ -1,8 +1,15 @@
 cmake_minimum_required(VERSION 3.21)
 
+# Version
+file(READ include/ttdal.h header)
+foreach(part MAJOR MINOR PATCH)
+    string(REGEX MATCH "#define TTDAL_VERSION_${part} ([0-9]+)" _ "${header}")
+    set(TTDAL_VERSION_${part} ${CMAKE_MATCH_1})
+endforeach()
+
 project(
     ttdal
-    VERSION 0.1.0
+    VERSION ${TTDAL_VERSION_MAJOR}.${TTDAL_VERSION_MINOR}.${TTDAL_VERSION_PATCH}
     DESCRIPTION "Tenstorrent Device Access Library"
     LANGUAGES C
 )

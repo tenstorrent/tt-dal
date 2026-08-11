@@ -504,6 +504,7 @@ dependencies = [
  "bindgen",
  "cc",
  "cmake",
+ "semver",
 ]
 
 [[package]]

@@ -27,6 +27,7 @@ path = "sys/src/lib.rs"
 bindgen = { workspace = true }
 cc = { workspace = true }
 cmake = { workspace = true }
+semver = { workspace = true }
 
 [workspace]
 resolver = "2"
@@ -49,4 +50,5 @@ bindgen = "0.72.1"
 cc = "1.4.0"
 cmake = "0.1.58"
 libc = "0.2.189"
+semver = "1.0.28"
 ttdal-sys = { path = ".", version = "0.1.0" }
