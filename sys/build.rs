@@ -1,6 +1,6 @@
 fn main() {
     // Build and install libttdal via the parent CMakeLists.txt.
-    let dst = cmake::Config::new("../../..").build();
+    let dst = cmake::Config::new(env!("CARGO_MANIFEST_DIR")).build();
 
     // Tell cargo where to find libttdal and to link it statically.
     println!("cargo:rustc-link-search=native={}/lib", dst.display());
