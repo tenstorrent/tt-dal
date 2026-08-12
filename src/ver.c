@@ -15,7 +15,7 @@
 ///
 /// Discovers the first available device, issues the driver info `ioctl` through
 /// it, then closes it.
-int tt_version_driver(tt_version_t *version) {
+int tt_kmd_version(tt_version_t *version) {
     // Validate args
     if (!version)
         return tt_fail(EINVAL);
@@ -58,7 +58,7 @@ int tt_version_driver(tt_version_t *version) {
 ///
 /// Reads the version from a per-device attribute and parses it into a
 /// `tt_version_t`.
-int tt_version_firmware(const tt_session_t *sess, tt_version_t *version) {
+int tt_fw_version(const tt_session_t *sess, tt_version_t *version) {
     // Validate args
     if (!sess || !version)
         return tt_fail(EINVAL);

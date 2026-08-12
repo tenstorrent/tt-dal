@@ -11,12 +11,26 @@
 
 #![warn(clippy::pedantic)]
 
+use semver::Version;
+
 pub(crate) use ttdal_sys as ffi;
 pub mod dev;
+pub mod fw;
+pub mod kmd;
 pub mod pci;
-pub mod ver;
 
 mod err;
+mod ver;
+
+/// Returns the library version.
+#[must_use]
+pub const fn version() -> Version {
+    Version::new(
+        ffi::TTDAL_VERSION_MAJOR as u64,
+        ffi::TTDAL_VERSION_MINOR as u64,
+        ffi::TTDAL_VERSION_PATCH as u64,
+    )
+}
 
 /// Device architecture.
 ///

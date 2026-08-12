@@ -43,8 +43,8 @@ import ttdal.tlb
 import ttdal.power
 
 # Versions
-print(ttdal.version())      # library version
-print(ttdal.kmd_version())  # kernel driver version
+print(ttdal.__version__)    # library version
+print(ttdal.kmd.version())  # kernel driver version
 
 # Device discovery
 devs = ttdal.scan()
@@ -53,6 +53,7 @@ devs = ttdal.scan()
 with devs[0].open() as sess:
     info = sess.info()    # static device info
     telem = sess.telemetry()
+    bundle = ttdal.fw.version(sess)  # firmware bundle version
 
     # TLB window (context manager)
     cfg = ttdal.tlb.Config(addr=0x1000, x_end=0, y_end=0)

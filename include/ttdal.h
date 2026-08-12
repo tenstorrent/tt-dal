@@ -60,7 +60,7 @@ typedef struct tt_version {
 /// Use this to verify ABI compatibility.
 ///
 /// @return  Library version.
-[[nodiscard]] static inline tt_version_t tt_version_dal(void) {
+[[nodiscard]] static inline tt_version_t tt_version(void) {
     return (tt_version_t){
         .major = TTDAL_VERSION_MAJOR,
         .minor = TTDAL_VERSION_MINOR,
@@ -85,7 +85,7 @@ typedef struct tt_version {
 /// * `ECONNRESET` The device was reset or removed out-of-band.
 ///
 /// Other codes propagate from the failing system call.
-[[nodiscard]] int tt_version_driver(tt_version_t *version);
+[[nodiscard]] int tt_kmd_version(tt_version_t *version);
 
 /// Get the device firmware version.
 ///
@@ -104,7 +104,7 @@ typedef struct tt_version {
 ///
 /// Other codes propagate from the failing system call.
 [[nodiscard]] int
-tt_version_firmware(const tt_session_t *sess, tt_version_t *version);
+tt_fw_version(const tt_session_t *sess, tt_version_t *version);
 
 /*============================================================================*
  * ERRORS                                                                     *

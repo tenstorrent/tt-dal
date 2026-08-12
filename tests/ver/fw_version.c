@@ -11,7 +11,7 @@ int main(void) {
     if (!sess)
         return EXIT_FAILURE;
     tt_version_t ver;
-    int rc = tt_version_firmware(sess, &ver);
+    int rc = tt_fw_version(sess, &ver);
     // Firmware version should be at least 19.x
     if (rc == 0)
         assert(ver.major >= 19);

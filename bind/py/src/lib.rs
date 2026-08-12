@@ -12,6 +12,8 @@
 pub(crate) use ttdal_sys as ffi;
 mod dev;
 mod err;
+mod fw;
+mod kmd;
 mod ver;
 
 use pyo3::prelude::*;
@@ -30,15 +32,32 @@ fn ttdal(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<dev::Session>()?;
     m.add_class::<dev::Info>()?;
 
-    // version submodule
-    let version = PyModule::new(py, "version")?;
-    version.add_function(wrap_pyfunction!(ver::library, &version)?)?;
-    version.add_function(wrap_pyfunction!(ver::driver, &version)?)?;
-    version.add_function(wrap_pyfunction!(ver::firmware, &version)?)?;
-    m.add_submodule(&version)?;
+    // Library version
+    m.add(
+        "__version__",
+        format!(
+            "{}.{}.{}",
+            ffi::TTDAL_VERSION_MAJOR,
+            ffi::TTDAL_VERSION_MINOR,
+            ffi::TTDAL_VERSION_PATCH,
+        ),
+    )?;
+
+    // kmd submodule
+    let kmd = PyModule::new(py, "kmd")?;
+    kmd.add_function(wrap_pyfunction!(crate::kmd::version, &kmd)?)?;
+    m.add_submodule(&kmd)?;
     py.import("sys")?
         .getattr("modules")?
-        .set_item("ttdal.version", version)?;
+        .set_item("ttdal.kmd", kmd)?;
+
+    // fw submodule
+    let fw = PyModule::new(py, "fw")?;
+    fw.add_function(wrap_pyfunction!(crate::fw::version, &fw)?)?;
+    m.add_submodule(&fw)?;
+    py.import("sys")?
+        .getattr("modules")?
+        .set_item("ttdal.fw", fw)?;
 
     // tlb submodule
     let tlb = PyModule::new(py, "tlb")?;
