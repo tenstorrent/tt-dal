@@ -6,6 +6,8 @@ build-backend = "maturin"
 name = "ttdal"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 keywords = ["tenstorrent", "accelerator", "hardware", "driver"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -16,7 +18,7 @@ classifiers = [
     "Topic :: System :: Hardware",
 ]
 dependencies = ["semver>=3.0.4"]
-dynamic = ["version", "description", "license"]
+dynamic = ["version", "description"]
 
 [project.urls]
 Repository = "https://github.com/tenstorrent/tt-dal"

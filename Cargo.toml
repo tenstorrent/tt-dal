@@ -13,6 +13,7 @@ build = "sys/build.rs"
 include = [
     "/CMakeLists.txt",
     "/LICENSE",
+    "/NOTICE",
     "/cmake/**",
     "/include/**",
     "/src/**",
