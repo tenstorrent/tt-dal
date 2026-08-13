@@ -27,7 +27,8 @@ management.
 This library is designed as a stateless C API with transparent handles and no
 hidden state. Provided operations selectively use the kernel driver (KMD) or
 directly interact with hardware (e.g. registers). See [DESIGN.md](/DESIGN.md)
-for detailed philosophy and design decisions.
+for detailed philosophy and design decisions, and [QUIRKS.md](/QUIRKS.md) for
+documented hardware quirks and workarounds.
 
 ## Stability
 
@@ -83,6 +84,23 @@ from the repository root.
 
 See the public header for complete API documentation.
 
+### Installing
+
+```bash
+cmake --install build --prefix /usr/local
+```
+
+This installs `libttdal.a`, the public header, and the CMake package
+configuration for downstream `find_package(ttdal)` consumers.
+
+### Examples
+
+Example programs are provided under [`examples/`](/examples):
+
+- `scan`: discover and list all connected devices
+- `power`: interactive power state control
+- `reset`: reset one or more devices
+
 ## Testing
 
 ```bash
@@ -122,15 +140,33 @@ system. Language bindings are available under `bind/`:
 ├── bind/            # language bindings
 │   ├── py/          # python wheel
 │   └── rs/          # rust crate
+├── cmake/           # cmake modules
+├── examples/        # usage examples
 ├── include/         # public interface
 ├── src/             # core implementation
-└── tests/           # integration tests
+├── sys/             # ffi bindings
+├── tests/           # integration tests
+└── vendor/          # vendored sources
 ```
+
+## Contributing
+
+Contributions are welcome. Bugs are reported through [GitHub Issues][issues],
+and changes are submitted through pull requests, which are reviewed weekly. See
+[CONTRIBUTING.md](/CONTRIBUTING.md) for details and
+[CODE_OF_CONDUCT.md](/CODE_OF_CONDUCT.md) for community expectations. Report
+security vulnerabilities as described in [SECURITY.md](/SECURITY.md), not
+through public issues.
+
+[issues]: https://github.com/tenstorrent/tt-dal/issues
 
 ## License
 
-This project is proprietary, with no license granted and all rights reserved.
-See [ALL-RIGHTS-RESERVED](/ALL-RIGHTS-RESERVED).
+- [LICENSE](/LICENSE) (Apache License 2.0): overall license for this project,
+  except where specified.
+- `vendor/tt-kmd/ioctl.h` is vendored from [tt-kmd] and remains under
+  `GPL-2.0-only WITH Linux-syscall-note`. The Linux syscall note permits its
+  use from Apache-2.0 licensed user-space code. See [NOTICE](/NOTICE).
 
 This software assists in programming Tenstorrent products. Making, using, or
 selling hardware, models, or IP may require the license of rights (such as
