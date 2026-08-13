@@ -1,4 +1,6 @@
 # SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.c")
 

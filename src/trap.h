@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 #ifndef TT_DAL_TRAP_H
 #define TT_DAL_TRAP_H

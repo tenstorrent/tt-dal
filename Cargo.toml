@@ -5,12 +5,14 @@ edition = { workspace = true }
 rust-version = { workspace = true }
 description = "FFI bindings to ttdal"
 repository = { workspace = true }
+license = { workspace = true }
 keywords = { workspace = true }
 categories = { workspace = true }
 links = "ttdal"
 build = "sys/build.rs"
 include = [
     "/CMakeLists.txt",
+    "/LICENSE",
     "/cmake/**",
     "/include/**",
     "/src/**",
@@ -42,6 +44,7 @@ edition = "2024"
 rust-version = "1.87"
 description = "Tenstorrent Device Access Library"
 repository = "https://github.com/tenstorrent/tt-dal"
+license = "Apache-2.0"
 keywords = ["tenstorrent", "accelerator", "hardware", "driver", "ffi"]
 categories = ["hardware-support", "api-bindings"]
 
