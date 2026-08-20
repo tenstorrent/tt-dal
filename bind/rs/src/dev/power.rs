@@ -123,7 +123,7 @@ impl Session {
     pub fn power(&self, flags: impl Into<FlagSet>) -> Result<()> {
         let raw = flags.into().0;
         // SAFETY: `sess` is an open device and `raw` is a valid bitmask.
-        self.call(|sess| err::check(unsafe { ffi::tt_power(sess.as_ptr(), raw) }))
+        self.perform(|sess| err::check(unsafe { ffi::tt_power(sess.as_ptr(), raw) }))
     }
 }
 

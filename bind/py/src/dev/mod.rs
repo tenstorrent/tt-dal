@@ -114,8 +114,17 @@ impl Device {
     /// - `ENODEV` if the device could not be opened.
     /// - `EAGAIN` if `nonblocking` is set and another client holds the
     ///   device incompatibly.
+    ///
+    /// A blocking open waits for as long as the other client holds the device,
+    /// so this releases the interpreter lock while it waits.
     #[pyo3(signature = (*, exclusive = false, nonblocking = false, persistent = false))]
-    pub fn open(&self, exclusive: bool, nonblocking: bool, persistent: bool) -> PyResult<Session> {
+    pub fn open(
+        &self,
+        py: Python<'_>,
+        exclusive: bool,
+        nonblocking: bool,
+        persistent: bool,
+    ) -> PyResult<Session> {
         let mut flags = 0;
         if exclusive {
             flags |= ffi::TT_OPEN_EXCL;
@@ -124,13 +133,27 @@ impl Device {
             flags |= ffi::TT_OPEN_NONBLOCK;
         }
         let flags = flags as u16;
-        let mut raw = MaybeUninit::<ffi::tt_session_t>::uninit();
-        // SAFETY: `self.0` is a valid device descriptor and raw is a valid
-        // out-pointer for tt_session_t.
-        crate::err::check(unsafe { ffi::tt_open(&self.0, raw.as_mut_ptr(), flags) })?;
+
+        // Opened on a copy of the descriptor so the wait can run without the
+        // interpreter lock.
+        let dev = self.0;
+        let (rc, errno, sess) = py.detach(move || {
+            let mut sess = MaybeUninit::<ffi::tt_session_t>::uninit();
+            // SAFETY: `dev` is a valid device descriptor and `sess` is a valid
+            // out-pointer for tt_session_t.
+            let rc = unsafe { ffi::tt_open(&raw const dev, sess.as_mut_ptr(), flags) };
+            // Read here, before reattaching can clobber it.
+            let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+            (rc, errno, sess)
+        });
+
+        if rc != 0 {
+            return Err(crate::err::fail(errno));
+        }
         Ok(Session {
-            // SAFETY: `raw` was fully initialized by the successful call above.
-            raw: unsafe { raw.assume_init() },
+            // SAFETY: `sess` was fully initialized by the successful call
+            // above.
+            raw: unsafe { sess.assume_init() },
             persist: persistent,
         })
     }
@@ -160,6 +183,22 @@ impl Session {
         self.raw.fd < 0
     }
 
+    /// Returns a copy of the underlying session handle.
+    ///
+    /// The handle is plain data, so a copy can cross a `Python::detach`
+    /// boundary that a raw pointer cannot.
+    pub(crate) fn raw(&self) -> ffi::tt_session_t {
+        self.raw
+    }
+
+    /// Replaces the underlying session handle.
+    ///
+    /// Used to adopt a handle that a call mutated on a copy while the
+    /// interpreter lock was released.
+    pub(crate) fn set_raw(&mut self, raw: ffi::tt_session_t) {
+        self.raw = raw;
+    }
+
     /// Returns a const raw pointer to the underlying session handle.
     pub(crate) fn as_ptr(&self) -> *const ffi::tt_session_t {
         &self.raw
@@ -172,7 +211,7 @@ impl Session {
 
     /// Runs a device operation, reopening a persistent session when the
     /// device connection was lost.
-    pub(crate) fn call<T>(
+    pub(crate) fn perform<T>(
         &mut self,
         mut op: impl FnMut(*const ffi::tt_session_t) -> PyResult<T>,
     ) -> PyResult<T> {
@@ -266,7 +305,7 @@ impl Session {
     ///
     /// Other `errno` values propagate from the failing system call.
     pub fn info(&mut self) -> PyResult<Info> {
-        self.call(|sess| {
+        self.perform(|sess| {
             // SAFETY: Zeroing tt_dev_info_t is valid. All fields are plain
             // integers.
             let mut info: ffi::tt_dev_info_t = unsafe { std::mem::zeroed() };

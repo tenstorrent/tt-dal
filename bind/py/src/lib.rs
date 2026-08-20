@@ -82,6 +82,7 @@ fn ttdal(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // smc submodule
     let smc = PyModule::new(py, "smc")?;
     smc.add_class::<dev::smc::Message>()?;
+    smc.add_class::<dev::smc::Queued>()?;
     m.add_submodule(&smc)?;
     py.import("sys")?
         .getattr("modules")?

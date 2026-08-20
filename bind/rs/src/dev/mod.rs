@@ -258,7 +258,7 @@ impl Session {
 
     /// Runs a device operation, reopening a persistent session when the
     /// device connection was lost.
-    pub(crate) fn call<T>(&self, mut op: impl FnMut(&Self) -> Result<T>) -> Result<T> {
+    pub(crate) fn perform<T>(&self, mut op: impl FnMut(&Self) -> Result<T>) -> Result<T> {
         /// Reopen attempts before a persistent session gives up.
         const RETRIES: u32 = 3;
 
@@ -356,7 +356,7 @@ impl Session {
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     #[expect(clippy::missing_panics_doc)]
     pub fn info(&self) -> Result<Info> {
-        self.call(|sess| {
+        self.perform(|sess| {
             // SAFETY: `Info` is a C struct, so zero-initializing it is valid.
             let mut info: Info = unsafe { std::mem::zeroed() };
             info.output_size_bytes =

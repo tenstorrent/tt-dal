@@ -410,7 +410,7 @@ impl Session {
         caching: Caching,
         py: Python<'_>,
     ) -> PyResult<Tlb> {
-        let raw = slf.call(|sess| {
+        let raw = slf.perform(|sess| {
             let mut raw = MaybeUninit::<ffi::tt_tlb_t>::uninit();
             // SAFETY: `sess` is an open device and raw is a valid out-pointer.
             crate::err::check(unsafe {

@@ -6,6 +6,11 @@
 #include <stdlib.h>
 #include <ttdal.h>
 
+/// SMC TEST message code.
+///
+/// The controller echoes the argument in word 1 plus one.
+#define SMC_MSG_TEST 0x90
+
 /// Open the first available device.
 ///
 /// Returns NULL if the driver is not installed or no devices are found. Asserts

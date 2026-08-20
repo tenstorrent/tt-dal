@@ -8,6 +8,10 @@
  * Tenstorrent accelerator hardware. It is designed to be consumed by
  * higher-level libraries.
  *
+ * The library holds no global state and takes no locks. A session wraps one
+ * file descriptor and is not safe to use from more than one thread at a time.
+ * Open a session per thread instead, which the driver supports and arbitrates.
+ *
  * The header uses C23 attributes, so consumers need C23 (or C++17 for C++
  * consumers).
  *
@@ -628,32 +632,166 @@ typedef struct tt_tlb_config {
  * managing firmware, power, and clocks.                                      *
  *============================================================================*/
 
-/// SMC message.
-typedef struct tt_message {
-    /// Message code.
-    uint8_t code;
-    /// Message data.
-    uint32_t data[8];
-} tt_message_t;
-
-/// Send a message to SMC.
+/// Default response timeout in milliseconds.
 ///
-/// @warning SMC messaging is unimplemented. Past its argument guards, this
-/// function aborts the process.
+/// Selected by passing `0` as a timeout.
+#define TT_SMC_TIMEOUT_DEFAULT 1000u
+
+/// SMC message.
+typedef struct tt_smc_msg {
+    /// Message words. Word 0 is the header: the message code in its low byte
+    /// plus any per-message packed fields, and the firmware status on a
+    /// response. Words 1 through 7 carry the request arguments or the
+    /// response data.
+    uint32_t message[8];
+} tt_smc_msg_t;
+
+/// Call SMC with a message.
+///
+/// Posts `req` to the controller's per-session message queue, then polls for
+/// the response until it arrives or `timeout` milliseconds elapse, and writes
+/// the reply to `rsp`. A session holds at most one message outstanding at a
+/// time. An outstanding message is dropped on any early return, leaving the
+/// session free to post again. A dropped message may still run, as described
+/// for `tt_smc_drop()`.
+///
+/// The request is left untouched, so the same message can be sent again. One
+/// object may serve as both `req` and `rsp` to exchange a message in place.
+///
+/// Success means the exchange completed, not that the firmware accepted the
+/// message: inspect `rsp.message[0]` (the firmware status, `0` on success) for
+/// message-level errors.
 ///
 /// @param sess           Session handle.
-/// @param[in,out] msg    SMC message body.
-/// @param wait           Wait for completion.
-/// @param timeout        Timeout in milliseconds (`0` for default 1000ms).
+/// @param req            SMC message to send.
+/// @param[out] rsp       Response message.
+/// @param timeout        Poll timeout in ms (`0` for `TT_SMC_TIMEOUT_DEFAULT`).
 /// @return               0 on success, -1 on error (check `errno`).
 ///
 /// @par Errors
 ///
-/// * `EINVAL`     `sess` or `msg` is `NULL`.
+/// * `EINVAL`     `sess`, `req`, or `rsp` is `NULL`.
 /// * `ENOTCONN`   The session is not open.
-[[nodiscard]] int tt_message(
-    const tt_session_t *sess, tt_message_t *msg, bool wait, uint32_t timeout
+/// * `EBUSY`      The session already has a message outstanding.
+/// * `ETIMEDOUT`  No response arrived within `timeout`.
+/// * `ENOTSUP`    The firmware provides no usable message queue.
+/// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
+///
+/// Other codes propagate from the failing system call.
+[[nodiscard]] int tt_smc_call(
+    const tt_session_t *sess,
+    const tt_smc_msg_t *req,
+    tt_smc_msg_t *rsp,
+    uint32_t timeout
 );
+
+/// Post a message to SMC.
+///
+/// Submits `req` to the controller's per-session message queue and returns
+/// without waiting for the response. The message stays outstanding until
+/// `tt_smc_poll()` or `tt_smc_wait()` retrieves the response, or
+/// `tt_smc_drop()` discards it. A session holds at most one message
+/// outstanding at a time.
+///
+/// The request is left untouched, so the same message can be posted again once
+/// the response is retrieved.
+///
+/// @param sess  Session handle.
+/// @param req   SMC message to post.
+/// @return      0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `sess` or `req` is `NULL`.
+/// * `ENOTCONN`   The session is not open.
+/// * `EBUSY`      The session already has a message outstanding.
+/// * `ENOTSUP`    The firmware provides no usable message queue.
+/// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
+///
+/// Other codes propagate from the failing system call.
+[[nodiscard]] int
+tt_smc_post(const tt_session_t *sess, const tt_smc_msg_t *req);
+
+/// Poll for a response from SMC.
+///
+/// Checks once whether the response to a posted message is ready, without
+/// blocking. On success writes the reply to `rsp`, freeing the session to post
+/// again. A response that is not ready leaves the message outstanding, to poll
+/// again or cancel, and `rsp` untouched.
+///
+/// Success means the exchange completed, not that the firmware accepted the
+/// message: inspect `rsp.message[0]` (the firmware status, `0` on success) for
+/// message-level errors. A failed exchange reports its own error and consumes
+/// the message, also freeing the session to post again.
+///
+/// @param sess           Session handle.
+/// @param[out] rsp       Response message.
+/// @return               0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `sess` or `rsp` is `NULL`.
+/// * `ENOTCONN`   The session is not open.
+/// * `EAGAIN`     No response is ready yet.
+/// * `ESRCH`      The session has no message outstanding.
+/// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
+///
+/// Other codes propagate from the failing exchange.
+[[nodiscard]] int tt_smc_poll(const tt_session_t *sess, tt_smc_msg_t *rsp);
+
+/// Wait for a response from SMC.
+///
+/// Polls for the response to a posted message until it arrives, `timeout`
+/// milliseconds elapse, or the exchange fails. On success writes the reply to
+/// `rsp`, freeing the session to post again. On timeout the message is left
+/// outstanding, to wait on again or cancel, and `rsp` untouched.
+///
+/// Success means the exchange completed, not that the firmware accepted the
+/// message: inspect `rsp.message[0]` (the firmware status, `0` on success) for
+/// message-level errors. A failed exchange reports its own error and consumes
+/// the message, also freeing the session to post again.
+///
+/// @param sess           Session handle.
+/// @param[out] rsp       Response message.
+/// @param timeout        Poll timeout in ms (`0` for `TT_SMC_TIMEOUT_DEFAULT`).
+/// @return               0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `sess` or `rsp` is `NULL`.
+/// * `ENOTCONN`   The session is not open.
+/// * `ESRCH`      The session has no message outstanding.
+/// * `ETIMEDOUT`  No response arrived within `timeout`.
+/// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
+///
+/// Other codes propagate from the failing exchange.
+[[nodiscard]] int
+tt_smc_wait(const tt_session_t *sess, tt_smc_msg_t *rsp, uint32_t timeout);
+
+/// Drop an outstanding SMC message.
+///
+/// Discards the message posted with `tt_smc_post()`. A session with
+/// nothing outstanding is left untouched. The session is free to post again
+/// on return.
+///
+/// Dropping does not reliably stop the message. The driver discards it
+/// outright only while it is still queued behind another client's message.
+/// Once it reaches the controller, which is usually before
+/// `tt_smc_post()` returns, the message runs and only its response is
+/// thrown away. A caller cannot tell the two apart, so treat a dropped
+/// message as one that may have run and may have changed device state.
+///
+/// @param sess  Session handle.
+/// @return      0 on success, -1 on error (check `errno`).
+///
+/// @par Errors
+///
+/// * `EINVAL`     `sess` is `NULL`.
+/// * `ENOTCONN`   The session is not open.
+/// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
+///
+/// Other codes propagate from the failing system call.
+[[nodiscard]] int tt_smc_drop(const tt_session_t *sess);
 
 /*============================================================================*
  * TELEMETRY                                                                  *

@@ -21,6 +21,15 @@ impl ParseCallbacks for TtdalCallbacks {
 }
 
 fn main() {
+    // Rebuild when the C library changes.
+    //
+    // bindgen's `CargoCallbacks` tracks only the installed header under
+    // `OUT_DIR`, so without these the bindings go stale whenever the source
+    // header is edited.
+    println!("cargo:rerun-if-changed=include/ttdal.h");
+    println!("cargo:rerun-if-changed=src");
+    println!("cargo:rerun-if-changed=CMakeLists.txt");
+
     // Build and install libttdal via the parent CMakeLists.txt.
     let dst = cmake::Config::new(env!("CARGO_MANIFEST_DIR")).build();
 

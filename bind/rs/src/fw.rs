@@ -16,7 +16,7 @@ use crate::{Result, err, ffi};
 ///
 /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
 pub fn version(dev: &Session) -> Result<Version> {
-    dev.call(|sess| {
+    dev.perform(|sess| {
         let mut raw = std::mem::MaybeUninit::<ffi::tt_version_t>::uninit();
         // SAFETY: `sess` is an open device and `raw` is a valid out-pointer
         // for `tt_version_t`.

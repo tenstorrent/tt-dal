@@ -207,7 +207,7 @@ impl Session {
     ///
     /// Other `errno` values propagate from the failing system call.
     pub fn telemetry(&mut self) -> PyResult<Telemetry> {
-        self.call(|sess| {
+        self.perform(|sess| {
             let mut table = vec![0u32; ffi::TT_TELEMETRY_LEN as usize];
             // SAFETY: `sess` is an open device and table.as_mut_ptr() is valid
             // for TT_TELEMETRY_LEN u32 writes.
