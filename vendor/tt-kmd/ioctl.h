@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 // SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note
 
-//==============================================================================
-// Vendored from tt-kmd@8e1017f
-// Modified: Added platform fence for non-Linux builds
-//==============================================================================
-
 #ifndef TTDRIVER_IOCTL_H_INCLUDED
 #define TTDRIVER_IOCTL_H_INCLUDED
+
+//==============================================================================
+// Vendored from tt-kmd@c05f224
+// Modified: Added platform fence for non-Linux builds
+//==============================================================================
 
 #ifdef __linux__
 #include <linux/types.h>
@@ -45,6 +45,8 @@ typedef int64_t __s64;
 #define TENSTORRENT_IOCTL_CONFIGURE_TLB		_IO(TENSTORRENT_IOCTL_MAGIC, 13)
 #define TENSTORRENT_IOCTL_SET_NOC_CLEANUP		_IO(TENSTORRENT_IOCTL_MAGIC, 14)
 #define TENSTORRENT_IOCTL_SET_POWER_STATE		_IO(TENSTORRENT_IOCTL_MAGIC, 15)
+#define TENSTORRENT_IOCTL_EXPORT_TLB_DMABUF		_IO(TENSTORRENT_IOCTL_MAGIC, 16)
+#define TENSTORRENT_IOCTL_SMC_MSG		_IO(TENSTORRENT_IOCTL_MAGIC, 17)
 
 // For tenstorrent_mapping.mapping_id. These are not array indices.
 #define TENSTORRENT_MAPPING_UNUSED		0
@@ -186,6 +188,7 @@ struct tenstorrent_reset_device {
 #define TENSTORRENT_PIN_PAGES_CONTIGUOUS 1	// app attests that the pages are physically contiguous
 #define TENSTORRENT_PIN_PAGES_NOC_DMA 2		// app wants to use the pages for NOC DMA
 #define TENSTORRENT_PIN_PAGES_NOC_TOP_DOWN 4	// NOC DMA will be allocated top-down (default is bottom-up)
+#define TENSTORRENT_PIN_PAGES_READ_ONLY 8	// device will only read; IOMMU enforced, requires IOMMU translation
 
 struct tenstorrent_pin_pages_in {
 	__u32 output_size_bytes;
@@ -425,5 +428,98 @@ struct tenstorrent_power_state {
 #define TT_POWER_FLAG_L2CPU_ENABLE      (1U << 3) /* 1=Enable L2CPU,  0=Clock Gate L2CPU */
 	__u16 power_settings[14];
 };
+
+/**
+ * TENSTORRENT_IOCTL_EXPORT_TLB_DMABUF - export a TLB window as a dma-buf
+ *
+ * Wraps a previously-allocated TLB window (see TENSTORRENT_IOCTL_ALLOCATE_TLB)
+ * in a dma-buf and returns a file descriptor for it. The fd can be handed to
+ * another device's driver -- e.g. an RDMA NIC via ibv_reg_dmabuf_mr() -- so
+ * that device can perform peer-to-peer PCIe DMA into/out of the window, which
+ * routes onto the NOC according to the window's configuration (CONFIGURE_TLB).
+ *
+ * The exported region is [offset, offset + size); a size of 0 means the
+ * remainder of the window starting at offset.
+ *
+ * The region is a PCI BAR aperture with no backing pages, so importers must
+ * support peer-to-peer DMA. Both importers that implement move_notify and
+ * importers that pin the mapping are accepted.
+ *
+ * Resetting the device under in-flight P2P DMA can wedge the host hard enough
+ * to require out-of-band recovery, and a pin-only importer cannot be revoked to
+ * prevent the in-flight DMA. RESET_DEVICE is therefore refused with -EBUSY
+ * while any export is live.
+ *
+ * An export pins its window: FREE_TLB or close() of the owning fd does not
+ * return the window to the allocation pool while the export is live, so the
+ * window cannot be reallocated and reconfigured to redirect a live importer's
+ * DMA elsewhere on the NOC. The window is freed only once the dma-buf is
+ * released.
+ *
+ * @argsz: Must be sizeof(struct tenstorrent_export_tlb_dmabuf).
+ * @flags: Reserved for future use, must be 0.
+ * @tlb_id: A TLB window id returned by TENSTORRENT_IOCTL_ALLOCATE_TLB.
+ * @fd: OUT: the dma-buf file descriptor.
+ * @offset: Byte offset within the window at which the export begins; must be
+ *          page-aligned.
+ * @size: Number of bytes to export; 0 means to the end of the window. A
+ *        non-zero size must be a multiple of the page size.
+ */
+struct tenstorrent_export_tlb_dmabuf {
+	__u32 argsz;
+	__u32 flags;
+	__u32 tlb_id;
+	__s32 fd;
+	__u64 offset;
+	__u64 size;
+};
+
+/**
+ * TENSTORRENT_IOCTL_SMC_MSG - exchange a message with the system management controller
+ *
+ * The driver owns the SMC message queue and multiplexes it across all open
+ * file descriptors, so that concurrent processes can talk to the system
+ * management firmware without corrupting each other's messages.  Each fd may
+ * have at most one message outstanding at a time.
+ *
+ * The operation is selected by @flags:
+ *
+ * - POST submits @message.  Returns -EBUSY if this fd already has a message
+ *   outstanding.
+ * - POLL checks for the response.  On success the response is written back to
+ *   @message and the fd may POST again.  The driver does not interpret the
+ *   firmware status in @message[0]; a response with a nonzero status is still
+ *   a successful POLL.  Returns -EAGAIN if the message is still pending or
+ *   -ESRCH if nothing is outstanding.  If the exchange itself failed (the
+ *   driver could not reach the queue, or the firmware never responded), POLL
+ *   returns the corresponding errno (e.g. -EIO, -ETIMEDOUT); the message is
+ *   consumed and the fd may POST again.
+ * - ABANDON cancels any outstanding message; the response, if any, is
+ *   discarded when it arrives.  Always returns 0.
+ *
+ * POST and POLL may not be combined; a caller POSTs and then POLLs one or more
+ * times.  ABANDON is mutually exclusive with POST and POLL.  An outstanding
+ * message is implicitly abandoned when the fd is closed.
+ *
+ * Returns -EOPNOTSUPP on hardware without a usable message queue (e.g.
+ * firmware too old to publish a queue).
+ *
+ * @argsz: Must be sizeof(struct tenstorrent_smc_msg).
+ * @flags: Exactly one of TENSTORRENT_SMC_MSG_POST, _POLL, or _ABANDON.
+ * @queue_index: Must be 0 (reserved for future multi-queue support).
+ * @reserved0: Must be 0.
+ * @message: Request on POST, response on a successful POLL.
+ */
+struct tenstorrent_smc_msg {
+	__u32 argsz;
+	__u32 flags;
+#define TENSTORRENT_SMC_MSG_POST	(1 << 0)
+#define TENSTORRENT_SMC_MSG_POLL	(1 << 1)
+#define TENSTORRENT_SMC_MSG_ABANDON	(1 << 2)
+	__u32 queue_index;
+	__u32 reserved0;
+	__u32 message[8];
+};
+
 
 #endif
