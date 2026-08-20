@@ -11,10 +11,13 @@ so a matching device beyond the first 64 is missed and reports `ENODEV`.
 The bound comfortably exceeds the device count of any current system. File
 a bug if your deployment approaches it.
 
-## SMC messaging
+## SMC poll cadence
 
-`tt_message()` is unimplemented. Past its argument guards it aborts the
-process rather than silently pretending to succeed.
+`tt_smc_wait()` spins on the response for a few polls before sleeping a
+millisecond between them. Both the spin count and the sleep are
+implementation details tuned to observed firmware turnaround, not part of
+the contract, and either may change. Code that needs a specific polling
+rate should drive `tt_smc_poll()` itself.
 
 ## Signal handler
 

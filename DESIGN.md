@@ -447,6 +447,72 @@ telemetry table in a single operation.
 Users who need only specific tags can read the full snapshot and ignore unused
 values. The table is small enough that this is negligible overhead.
 
+#### SMC Messaging
+
+**TL;DR**: A blocking round trip built from three primitives that mirror the
+driver exactly, so a caller can drive an exchange itself.
+
+The driver multiplexes one SMC message queue across every open file
+descriptor, and each descriptor may have one message outstanding at a time.
+Submitting and collecting are separate ioctls: POST never waits for the
+firmware, and POLL reports `EAGAIN` until the reply lands. The API mirrors
+that shape rather than hiding it.
+
+`tt_smc_call()` is the whole exchange and is what most callers want. It is
+built from `tt_smc_post()` and `tt_smc_wait()`, which are public so a caller
+who cannot afford to block can drive the exchange from its own loop with
+`tt_smc_poll()`.
+
+**Decisions**:
+
+1. **The primitives never drop the message.** `tt_smc_poll()` returning
+   `EAGAIN` and `tt_smc_wait()` returning `ETIMEDOUT` both leave the message
+   outstanding, so the caller can poll again. Only `tt_smc_call()` drops, and
+   only when its own wait fails, which preserves its all-or-nothing contract.
+   Without this a caller could not build a poll loop at all.
+2. **Request and response are separate buffers.** `tt_smc_call()` takes
+   `const tt_smc_msg_t *req` and writes `tt_smc_msg_t *rsp`. The request
+   survives the call, so it can be retried, logged, or reused as a template.
+   No allocation is involved, since both buffers belong to the caller and the
+   copies already passed through a stack ioctl struct.
+3. **Aliasing is permitted, and no parameter is `restrict`.** Passing one
+   object as both `req` and `rsp` exchanges a message in place, which is the
+   natural port of an in/out signature. This is structurally safe: the request
+   is copied into the ioctl struct during POST, and the reply is written only
+   after a POLL succeeds. `restrict` would buy no optimization here (two
+   32-byte copies dominated by two syscalls) while making the obvious in-place
+   call undefined.
+4. **Dropping is not cancelling.** `tt_smc_drop()` removes the message only
+   while it is still queued in the driver behind another client's message.
+   Once it reaches the controller, which is usually before `tt_smc_post()`
+   returns, the message runs and only its reply is discarded. The firmware has
+   no cancel path. Since a caller cannot observe which case it hit, the
+   contract is that a dropped message may have run.
+
+The poll cadence inside `tt_smc_wait()` is deliberately not part of the
+contract. See [QUIRKS.md](QUIRKS.md).
+
+### Concurrency
+
+**TL;DR**: A session is the unit of concurrency. Do not share one across
+threads; open a second session on the same device instead.
+
+The library holds no global state and takes no locks. Every operation acts on
+a session, which wraps one file descriptor, and the kernel driver arbitrates
+between descriptors. Two threads sharing a single session race on that
+descriptor with no serialization from this library, and messaging makes the
+hazard concrete: one message may be outstanding per descriptor, so a second
+concurrent send reports `EBUSY`.
+
+The supported pattern is one session per thread. The driver multiplexes the
+device across descriptors by design, so several sessions on the same device
+is the sanctioned way to work in parallel, not a workaround.
+
+The bindings inherit this. The Rust `Session` is `Send` but not `Sync`, so
+sharing one between threads is a compile error rather than a runtime race.
+The Python binding releases the interpreter lock during the calls that wait,
+which means the same rule applies there and is no longer masked by the lock.
+
 ## Tradeoffs
 
 These are deliberate design choices with considered tradeoffs:

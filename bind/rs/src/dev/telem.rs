@@ -140,7 +140,7 @@ impl Session {
     /// [`Unsupported`]: std::io::ErrorKind::Unsupported
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn telemetry(&self) -> Result<Telemetry> {
-        self.call(|sess| {
+        self.perform(|sess| {
             let mut table = [0u32; ffi::TT_TELEMETRY_LEN as usize];
             // SAFETY: `sess` is an open device and `table` is valid for
             // `TT_TELEMETRY_LEN` u32 writes.

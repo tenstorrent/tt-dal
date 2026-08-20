@@ -28,10 +28,27 @@ impl Session {
     ///
     /// Other `errno` values propagate from the failing system call. The
     /// session is closed even on error.
-    pub fn reset(&mut self) -> PyResult<Device> {
-        // SAFETY: `self.raw` is a valid session handle. tt_reset_with consumes
-        // it (setting fd to -1) on all paths, so no double-close can occur.
-        crate::err::check(unsafe { ffi::tt_reset_with(self.as_mut_ptr()) })?;
+    ///
+    /// The reset sequence takes seconds, so this releases the interpreter lock
+    /// while it runs.
+    pub fn reset(&mut self, py: Python<'_>) -> PyResult<Device> {
+        // Reset a copy so the sequence can run without the interpreter lock,
+        // then adopt the consumed handle back into the session.
+        let mut sess = self.raw();
+        let (rc, errno, sess) = py.detach(move || {
+            // SAFETY: `sess` is a valid session handle. tt_reset_with consumes
+            // it (setting fd to -1) on all paths, so no double-close can
+            // occur.
+            let rc = unsafe { ffi::tt_reset_with(&raw mut sess) };
+            // Read here, before reattaching can clobber it.
+            let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+            (rc, errno, sess)
+        });
+        self.set_raw(sess);
+
+        if rc != 0 {
+            return Err(crate::err::fail(errno));
+        }
         Ok(self.dev())
     }
 }
@@ -53,9 +70,21 @@ impl Device {
     /// - `ETIMEDOUT` if the reset did not complete in time.
     ///
     /// Other `errno` values propagate from the failing system call.
+    ///
+    /// The reset sequence takes seconds, so this releases the interpreter lock
+    /// while it runs.
     #[pyo3(name = "reset")]
-    pub fn reset_(&self) -> PyResult<()> {
-        // SAFETY: `self.0` is a valid device descriptor.
-        crate::err::check(unsafe { ffi::tt_reset(&self.0) })
+    pub fn reset_(&self, py: Python<'_>) -> PyResult<()> {
+        let dev = self.0;
+        let (rc, errno) = py.detach(move || {
+            // SAFETY: `dev` is a valid device descriptor.
+            let rc = unsafe { ffi::tt_reset(&raw const dev) };
+            let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+            (rc, errno)
+        });
+        if rc != 0 {
+            return Err(crate::err::fail(errno));
+        }
+        Ok(())
     }
 }

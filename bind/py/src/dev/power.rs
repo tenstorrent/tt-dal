@@ -109,6 +109,6 @@ impl Session {
     /// Other `errno` values propagate from the failing system call.
     pub fn power(&mut self, flags: &Flag) -> PyResult<()> {
         // SAFETY: `sess` is an open device and flags.0 is a valid bitmask.
-        self.call(|sess| crate::err::check(unsafe { ffi::tt_power(sess, flags.0) }))
+        self.perform(|sess| crate::err::check(unsafe { ffi::tt_power(sess, flags.0) }))
     }
 }

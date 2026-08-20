@@ -209,7 +209,7 @@ impl Session {
     /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn alloc(&self, size: Size, mode: Caching) -> Result<Tlb<'_>> {
-        let raw = self.call(|sess| {
+        let raw = self.perform(|sess| {
             let mut raw = std::mem::MaybeUninit::<ffi::tt_tlb_t>::uninit();
             // SAFETY: `sess` is an open device and `raw` is a valid
             // out-pointer for `tt_tlb_t`.
