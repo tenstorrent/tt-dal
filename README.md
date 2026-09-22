@@ -165,9 +165,10 @@ through public issues.
 - [LICENSE](/LICENSE) (Apache License 2.0): overall license for this project,
   except where specified. See [LICENSE_understanding.txt](/LICENSE_understanding.txt)
   for a plain-language summary of how this license applies to this project.
-- `vendor/tt-kmd/ioctl.h` is vendored from [tt-kmd] and remains under
-  `GPL-2.0-only WITH Linux-syscall-note`. The Linux syscall note permits its
-  use from Apache-2.0 licensed user-space code. See [NOTICE](/NOTICE).
+- `vendor/tt-kmd/ioctl.h` is vendored from [tt-kmd]. It is authored by
+  Tenstorrent and was originally released under
+  `GPL-2.0-only WITH Linux-syscall-note`. It is re-released here under
+  Apache-2.0 and can be considered dual-licensed. See [NOTICE](/NOTICE).
 
 This software assists in programming Tenstorrent products. Making, using, or
 selling hardware, models, or IP may require the license of rights (such as
