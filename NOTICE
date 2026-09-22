@@ -32,8 +32,10 @@ each distributed under its own terms:
 Vendored Code:
 
 The following file is vendored (with modifications) from another Tenstorrent
-project and retains its original license, which differs from the Apache-2.0
-license of this project:
+project:
 
     vendor/tt-kmd/ioctl.h (https://github.com/tenstorrent/tt-kmd)
-        GPL-2.0-only WITH Linux-syscall-note
+
+This code is authored by Tenstorrent. It was originally released under
+GPL-2.0 WITH Linux-syscall-note. It is re-released here under Apache 2.0,
+and can be considered dual-licensed.
