@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+
 //! System Management Controller.
 //!
 //! The System Management Controller (SMC) is an on-chip firmware controller
