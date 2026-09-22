@@ -163,7 +163,8 @@ through public issues.
 ## License
 
 - [LICENSE](/LICENSE) (Apache License 2.0): overall license for this project,
-  except where specified.
+  except where specified. See [LICENSE_understanding.txt](/LICENSE_understanding.txt)
+  for a plain-language summary of how this license applies to this project.
 - `vendor/tt-kmd/ioctl.h` is vendored from [tt-kmd] and remains under
   `GPL-2.0-only WITH Linux-syscall-note`. The Linux syscall note permits its
   use from Apache-2.0 licensed user-space code. See [NOTICE](/NOTICE).
