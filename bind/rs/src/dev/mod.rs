@@ -491,7 +491,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires hardware"]
     #[serial]
     fn scan_nonempty() {
         let devs: Vec<_> = super::Device::scan().expect("device scan failed").collect();
@@ -499,14 +499,14 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires hardware"]
     #[serial]
     fn open_smoke() {
         crate::tests::open();
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires hardware"]
     #[serial]
     fn reopen_smoke() {
         let sess = crate::tests::open();
@@ -514,7 +514,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires hardware"]
     #[serial]
     fn session_dev_roundtrip() {
         let dev = crate::tests::open().dev();
@@ -523,7 +523,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires hardware"]
     #[serial]
     fn info_smoke() {
         let info = crate::tests::open().info().expect("info failed");

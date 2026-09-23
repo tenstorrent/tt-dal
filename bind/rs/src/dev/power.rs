@@ -172,7 +172,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires hardware"]
     #[serial]
     fn power_hi() {
         crate::tests::open()
@@ -181,7 +181,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires hardware"]
     #[serial]
     fn power_lo() {
         crate::tests::open()

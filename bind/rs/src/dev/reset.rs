@@ -95,7 +95,7 @@ mod tests {
     use serial_test::serial;
 
     #[test]
-    #[ignore]
+    #[ignore = "requires hardware"]
     #[serial]
     fn reset_smoke() {
         let _ = crate::tests::open().reset().expect("reset failed");
