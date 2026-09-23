@@ -37,7 +37,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore]
+    #[ignore = "requires tt-kmd"]
     #[serial]
     fn kmd_version() {
         assert!(Version::new(2, 7, 0) <= version().expect("kmd version failed"));

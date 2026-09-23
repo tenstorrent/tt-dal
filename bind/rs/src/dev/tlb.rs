@@ -247,7 +247,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires hardware"]
     #[serial]
     fn alloc_smoke() {
         let dev = crate::tests::open();
@@ -257,7 +257,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires hardware"]
     #[serial]
     fn bind_smoke() {
         let dev = crate::tests::open();
@@ -280,7 +280,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires hardware"]
     #[serial]
     fn read_write() {
         let dev = crate::tests::open();

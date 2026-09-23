@@ -8,7 +8,7 @@ use std::sync::Mutex;
 
 static VERSION: Mutex<Version> = Mutex::new(Version::new(0, 0, 0));
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct TtdalCallbacks;
 
 impl ParseCallbacks for TtdalCallbacks {
@@ -62,7 +62,7 @@ fn main() {
         // header files changed.
         .allowlist_file(".*ttdal\\.h")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
-        .parse_callbacks(Box::new(TtdalCallbacks::default()))
+        .parse_callbacks(Box::new(TtdalCallbacks))
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.

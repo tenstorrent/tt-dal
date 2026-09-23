@@ -37,7 +37,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore]
+    #[ignore = "requires hardware"]
     #[serial]
     fn fw_version() {
         assert!(
