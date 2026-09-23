@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+
 //! Power state.
 //!
 //! Controls which power features are requested to be active on the device. Each
