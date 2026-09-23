@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+
 //! Chip telemetry.
 //!
 //! Provides a snapshot of runtime sensor and status values reported

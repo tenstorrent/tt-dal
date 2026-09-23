@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+
 use bindgen::callbacks::{IntKind, ParseCallbacks};
 use semver::{Prerelease, Version};
 use std::sync::Mutex;

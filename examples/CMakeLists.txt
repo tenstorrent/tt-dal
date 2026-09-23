@@ -1,4 +1,6 @@
 # SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
 
 # Auto-discover examples (each is a directory with src/main.c)
 file(GLOB DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *)

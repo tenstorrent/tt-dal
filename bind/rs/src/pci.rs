@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+
 //! PCI address types.
 //!
 //! This module provides [`Address`], a PCI BDF (Bus/Device/Function) address

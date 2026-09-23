@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: © 2026 Tenstorrent Inc.
+//
+// SPDX-License-Identifier: Apache-2.0
+
 //! Memory windows.
 //!
 //! Translation Lookaside Buffer (TLB) windows map a region of device NOC
