@@ -266,7 +266,7 @@ impl Session {
         if !self.is_closed() {
             // SAFETY: `self.raw` is an open session. Closing exactly once
             // is safe.
-            crate::err::check(unsafe { ffi::tt_close(&raw mut self.raw) })?;
+            crate::err::check(unsafe { ffi::tt_close(self.as_mut_ptr()) })?;
         }
         Ok(())
     }
@@ -291,7 +291,7 @@ impl Session {
     pub fn reopen(&mut self) -> PyResult<()> {
         // SAFETY: `self.raw` is an initialized session. tt_reopen closes the
         // stale descriptor and reopens the device with the session's flags.
-        crate::err::check(unsafe { ffi::tt_reopen(&raw mut self.raw) })
+        crate::err::check(unsafe { ffi::tt_reopen(self.as_mut_ptr()) })
     }
 
     /// Returns the underlying device descriptor.
