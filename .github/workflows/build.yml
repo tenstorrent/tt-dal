@@ -1,0 +1,81 @@
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        default: ${{ github.ref }}
+        required: false
+        type: string
+      upload:
+        default: false
+        required: false
+        type: boolean
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: Upload artifacts
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+
+  # Build C library
+  c:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake
+      - name: Build library
+        run: |
+          cmake --preset default
+          cmake --build build
+
+  # Build Rust crates
+  rs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev cmake
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build workspace
+        run: cargo build --workspace
+
+  # Build Python wheels
+  py:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          target: x86_64
+          manylinux: 2_28
+          args: >-
+            --release --sdist --out dist
+            -m bind/py/Cargo.toml
+            --interpreter python3.10
+          before-script-linux: |
+            dnf install -y clang clang-devel cmake
+      - name: Store wheel
+        if: inputs.upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: wheels-abi3
+          path: dist
