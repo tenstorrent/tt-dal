@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin>=1.7,<2.0"]
+requires = ["maturin>=1.9.4,<2.0"]
 build-backend = "maturin"
 
 [project]
@@ -24,5 +24,4 @@ dynamic = ["version", "description"]
 Repository = "https://github.com/tenstorrent/tt-dal"
 
 [tool.maturin]
-features = ["pyo3/extension-module"]
 sdist-generator = "git"
