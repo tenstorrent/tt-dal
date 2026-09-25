@@ -1,0 +1,136 @@
+name: Publish
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+
+  # Tag the release commit, annotated with its release notes.
+  tag:
+    if: >-
+      startsWith(github.event.head_commit.message, 'chore(release): v') &&
+      github.event.head_commit.author.email == 'releases@tenstorrent.com'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+      - name: Create tag
+        id: tag
+        run: |
+          version=$(
+            cargo metadata --no-deps --format-version 1 \
+              | jq -r '.packages[] | select(.name=="ttdal") | .version'
+          )
+          tag="v$version"
+          git cliff --unreleased --tag "$tag" --strip all | sed 1d > notes.md
+          git config user.name "Tenstorrent"
+          git config user.email "releases@tenstorrent.com"
+          git tag --annotate --cleanup=verbatim "$tag" \
+            --file <(printf '%s\n\n' "$tag"; cat notes.md)
+          git push origin "$tag"
+          if git ls-remote --exit-code --heads origin "release/$tag" >/dev/null; then
+            git push origin --delete "release/$tag"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  # Build the C library, Rust crates and Python wheels from the tag.
+  build:
+    needs: tag
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: ${{ needs.tag.outputs.tag }}
+      upload: true
+
+  # Create the release as a draft, with its notes and a source archive.
+  draft:
+    needs:
+      - tag
+      - build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          name="tt-dal-${TAG#v}"
+          git archive --prefix="$name/" --output="$name.tar.gz" "$TAG"
+          sha256sum "$name.tar.gz" > "$name.tar.gz.sha256"
+          git tag --list --format='%(contents:body)' "$TAG" > notes.md
+          gh release create "$TAG" --draft --verify-tag --title "$TAG" \
+            --notes-file notes.md "$name.tar.gz" "$name.tar.gz.sha256"
+
+  # Publish the crates to crates.io via trusted publishing.
+  crates:
+    needs:
+      - tag
+      - draft
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev cmake
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - name: Publish crates
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: cargo publish --workspace
+
+  # Publish the wheel and sdist to PyPI via trusted publishing.
+  pypi:
+    needs: draft
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: wheels-abi3
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  # Publish the draft release once both registries have the new version.
+  announce:
+    needs:
+      - tag
+      - crates
+      - pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: |
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --draft=false --latest
