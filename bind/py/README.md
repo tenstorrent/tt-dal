@@ -6,10 +6,11 @@
   Python bindings for the Tenstorrent Device Access Library
 </p>
 
-Idiomatic Python bindings over [tt-dal](../../README.md), built with [PyO3]
-and [maturin]. Wraps the C library directly and exposes a submodule structure
-mirroring the Rust crate.
+Idiomatic Python bindings over [tt-dal], built with [PyO3] and [maturin]. Wraps
+the C library directly and exposes a submodule structure mirroring the Rust
+crate.
 
+[tt-dal]: https://github.com/tenstorrent/tt-dal
 [PyO3]: https://pyo3.rs
 [maturin]: https://www.maturin.rs
 
