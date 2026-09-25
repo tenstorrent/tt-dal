@@ -6,9 +6,9 @@
   Rust bindings for the Tenstorrent Device Access Library
 </p>
 
-Safe, idiomatic Rust bindings over [tt-dal](../../README.md). The crate is
-split between `ttdal`, which exposes the safe public API, and `ttdal-sys`,
-which provides the raw FFI layer.
+Safe, idiomatic Rust bindings over [tt-dal]. The crate is split between `ttdal`,
+which exposes the safe public API, and `ttdal-sys`, which provides the raw FFI
+layer.
 
 ## Organization
 
@@ -46,4 +46,5 @@ cargo test
 > cargo test -- --include-ignored   # run all tests
 > ```
 
+[tt-dal]: https://github.com/tenstorrent/tt-dal
 [tt-kmd]: https://github.com/tenstorrent/tt-kmd
