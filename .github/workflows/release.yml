@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release (default is computed from commits)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+
+  # Open a pull request that bumps the version and updates the changelog.
+  # Merging it runs the publish workflow.
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+      - name: Choose version
+        id: version
+        env:
+          INPUT: ${{ inputs.version }}
+        run: |
+          version=${INPUT:-$(git cliff --bumped-version)}
+          version=${version#v}
+          if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::invalid version: $version"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "::error::v$version is already released"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Bump version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          IFS=. read -r major minor patch <<< "$VERSION"
+          sed -i -E \
+            -e '/^\[workspace\.package\]/,/^\[/ s/^version = ".*"/version = "'"$VERSION"'"/' \
+            -e 's/^(ttdal-sys = \{ path = "\.", version = )"[^"]*"/\1"'"$VERSION"'"/' \
+            Cargo.toml
+          sed -i -E \
+            -e 's/^( \* @version ).*/\1'"$VERSION"'/' \
+            -e 's/^(#define TTDAL_VERSION_MAJOR ).*/\1'"$major"'/' \
+            -e 's/^(#define TTDAL_VERSION_MINOR ).*/\1'"$minor"'/' \
+            -e 's/^(#define TTDAL_VERSION_PATCH ).*/\1'"$patch"'/' \
+            include/ttdal.h
+          cargo update --workspace
+          git cliff --tag "v$VERSION" --output CHANGELOG.md
+          git diff --stat
+      - name: Open pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          branch="release/v$VERSION"
+          git config user.name "Tenstorrent"
+          git config user.email "releases@tenstorrent.com"
+          git switch --create "$branch"
+          git add --all
+          git commit --message "chore(release): v$VERSION"
+          git push origin "$branch"
+          git cliff --unreleased --tag "v$VERSION" --strip all > notes.md
+          gh pr create --base main --head "$branch" \
+            --title "chore(release): v$VERSION" --body-file notes.md
