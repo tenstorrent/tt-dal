@@ -3,7 +3,7 @@ requires = ["maturin>=1.9.4,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "ttdal"
+name = "tt-dal"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
