@@ -22,6 +22,12 @@ The crate is structured as follows:
 └── src/             # public bindings
 ```
 
+## Installation
+
+```bash
+cargo add ttdal
+```
+
 ## Building
 
 Requires CMake 3.21+ and a stable Rust toolchain.
