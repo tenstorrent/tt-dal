@@ -27,6 +27,12 @@ The package is structured as follows:
 └── src/             # public bindings
 ```
 
+## Installation
+
+```bash
+pip install tt-dal
+```
+
 ## Building
 
 Requires CMake 3.21+, a stable Rust toolchain, and [maturin].
