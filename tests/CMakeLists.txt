@@ -11,7 +11,9 @@ foreach(src ${SOURCES})
     string(REPLACE ".c" "" name "${src}")
     string(REPLACE "/" "." target "tests.${name}")
     add_executable(${target} ${src})
-    target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_include_directories(
+        ${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/src
+    )
     target_link_libraries(${target} PRIVATE ttdal)
     add_test(NAME ${name} COMMAND ${target})
     list(APPEND TARGETS ${target})

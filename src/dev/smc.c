@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#include "clock.h"
 #include "err.h"
 #include "ioctl.h"
 #include "ttdal.h"
@@ -14,14 +15,6 @@
 
 #define SPIN_POLLS 32         // back-to-back polls before sleeping between them
 #define POLL_INTERVAL_US 1000 // sleep between polls once the spin is spent
-
-/// Elapsed milliseconds since `start` on the monotonic clock.
-static uint64_t elapsed_ms(const struct timespec *start) {
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    return (uint64_t)(now.tv_sec - start->tv_sec) * 1000 +
-           (uint64_t)(now.tv_nsec - start->tv_nsec) / 1000000;
-}
 
 /// Call SMC with a message.
 ///
