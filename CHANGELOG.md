@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1]
+
+### Bug Fixes
+
+- *(smc)* Stop spurious timeouts
+
+### Continuous Integration
+
+- *(publish)* Trigger on changelog
+
 ## [0.1.0]
 
 ### Build System
@@ -103,5 +113,6 @@ All notable changes to this project will be documented in this file.
 - *(cargo)* Initial tests
 - *(ctest)* Initial tests
 
+[0.1.1]: https://github.com/tenstorrent/tt-dal/compare/v0.1.0..v0.1.1
 [0.1.0]: https://github.com/tenstorrent/tt-dal/tree/v0.1.0
 
