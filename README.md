@@ -6,6 +6,14 @@
   Tenstorrent Device Access Library
 </p>
 
+[![crates.io][crates.badge]][crates.hyper]
+[![pypi][pypi.badge]][pypi.hyper]
+
+[crates.badge]: https://img.shields.io/crates/v/ttdal
+[crates.hyper]: https://crates.io/crates/ttdal
+[pypi.badge]:   https://img.shields.io/pypi/v/tt-dal
+[pypi.hyper]:   https://pypi.org/project/tt-dal
+
 > [!NOTE]
 >
 > This library is under active development. The API is unstable and may change
