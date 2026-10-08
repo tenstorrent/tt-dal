@@ -114,7 +114,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v7
         with:
-          name: wheels-abi3
+          pattern: wheels-abi3*
+          merge-multiple: true
           path: dist
       - uses: pypa/gh-action-pypi-publish@release/v1
 
