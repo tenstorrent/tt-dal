@@ -20,6 +20,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(GNUInstallDirs)
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS include/*.h)
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.c)
 set_property(GLOBAL APPEND PROPERTY FORMATTED ${SOURCES} ${HEADERS})
@@ -35,6 +38,8 @@ target_include_directories(ttdal
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tt-kmd
 )
+
+target_link_libraries(ttdal PRIVATE Threads::Threads)
 
 set_target_properties(ttdal PROPERTIES
     C_STANDARD 23

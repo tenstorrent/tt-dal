@@ -7,4 +7,5 @@ Name: ttdal
 Description: @PROJECT_DESCRIPTION@
 Version: @PROJECT_VERSION@
 Libs: -L${libdir} -lttdal
+Libs.private: @CMAKE_THREAD_LIBS_INIT@
 Cflags: -I${includedir}

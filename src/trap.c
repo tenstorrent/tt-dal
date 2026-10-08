@@ -4,9 +4,9 @@
 
 #include "trap.h"
 
-#include <pthread.h>
 #include <signal.h>
 #include <stdint.h>
+#include <threads.h>
 
 _Thread_local sigjmp_buf tt_trap_jmp;
 
@@ -16,7 +16,7 @@ static _Thread_local size_t armed_len                  = 0;
 
 // Previously installed handler, chained for unrelated faults
 static struct sigaction prev;
-static pthread_once_t once = PTHREAD_ONCE_INIT;
+static once_flag once = ONCE_FLAG_INIT;
 
 /// Handle `SIGBUS` for guarded accesses.
 ///
@@ -55,7 +55,7 @@ static void install(void) {
 }
 
 void tt_trap_arm(const volatile void *ptr, size_t len) {
-    pthread_once(&once, install);
+    call_once(&once, install);
     armed_ptr = ptr;
     armed_len = len;
 }
