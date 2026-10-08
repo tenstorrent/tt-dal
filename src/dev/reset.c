@@ -13,6 +13,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#define POST_RESET_DELAY_US 500000 // firmware time to publish telemetry
+
 /// Reset device.
 ///
 /// Acquires exclusive access to the device, issues an ASIC reset, monitors
@@ -119,6 +121,16 @@ int tt_reset(const tt_device_t *dev) {
     }
     if (!reset_complete)
         return close(fd), tt_fail(ETIMEDOUT);
+
+    // Wait for firmware.
+    //
+    // Works around a defect in tt-kmd 2.11.0 and earlier: the post-reset
+    // `ioctl` probes firmware telemetry exactly once, and firmware publishes
+    // it about 350 ms after the marker clears. Issued any sooner, the driver
+    // is left without telemetry until the next reset or a module reload.
+    //
+    // FIXME: Remove once tt-kmd waits for firmware itself.
+    usleep(POST_RESET_DELAY_US);
 
     // Issue post-reset on the surviving fd
     req.in.flags = TENSTORRENT_RESET_DEVICE_POST_RESET;
