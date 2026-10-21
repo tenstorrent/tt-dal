@@ -109,7 +109,7 @@ int tt_reset(const tt_device_t *dev) {
             // Check in-place reset marker
             char config_path[80];
             snprintf(config_path, sizeof(config_path), "%s/config", sysfs_path);
-            int cfd = open(config_path, O_RDONLY);
+            int cfd = open(config_path, O_RDONLY | O_CLOEXEC);
             if (cfd >= 0) {
                 uint8_t cmd;
                 if (pread(cfd, &cmd, 1, 4) == 1 && ((cmd >> 6) & 1) == 0)
