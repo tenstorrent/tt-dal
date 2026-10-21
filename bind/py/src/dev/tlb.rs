@@ -174,7 +174,8 @@ impl Tlb {
     ///
     /// Idempotent, so freeing an already-freed TLB is a no-op.
     ///
-    /// Raises `TTError` with:
+    /// Raises `RuntimeError` if another thread is using the session.
+    /// Otherwise raises `TTError` with:
     ///
     /// - `ENOTCONN` if the session has been closed.
     /// - `ECONNRESET` if the session was severed by an out-of-band device
@@ -183,8 +184,8 @@ impl Tlb {
     /// Other `errno` values propagate from the failing system call.
     pub fn free(&mut self, py: Python<'_>) -> PyResult<()> {
         if !self.freed {
+            let sess = self.sess.try_borrow(py)?;
             self.freed = true;
-            let sess = self.sess.borrow(py);
             // SAFETY: `raw` was allocated by tt_tlb_alloc. tt_tlb_free handles
             // closed sessions.
             crate::err::check(unsafe { ffi::tt_tlb_free(Session::as_ptr(&sess), &mut self.raw) })?;
@@ -197,8 +198,8 @@ impl Tlb {
     ///
     /// Safe to call again after the previous `Window` has been dropped.
     ///
-    /// Raises `RuntimeError` if the TLB has already been freed. Otherwise
-    /// raises `TTError` with:
+    /// Raises `RuntimeError` if the TLB has already been freed, or if another
+    /// thread is using the session. Otherwise raises `TTError` with:
     ///
     /// - `ENOTCONN` if the session has been closed.
     /// - `ECONNRESET` if the session was severed by an out-of-band device
@@ -210,7 +211,7 @@ impl Tlb {
             return Err(PyRuntimeError::new_err("TLB has been freed"));
         }
         let dev_ptr = {
-            let sess = self_.sess.borrow(py);
+            let sess = self_.sess.try_borrow(py)?;
             Session::as_ptr(&sess)
         };
         let raw = ffi::tt_tlb_config_t {
