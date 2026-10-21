@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#include "clock.h"
 #include "err.h"
 #include "ioctl.h"
 #include "ttdal.h"
@@ -13,6 +14,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#define RESET_TIMEOUT_MS 5000      // budget for the device to signal completion
+#define POLL_INTERVAL_US 100000    // sleep between completion checks
 #define POST_RESET_DELAY_US 500000 // firmware time to publish telemetry
 
 /// Reset device.
@@ -92,8 +95,9 @@ int tt_reset(const tt_device_t *dev) {
     // the dead fd rather than targeting a re-probed instance.
     bool device_disappeared = false;
     bool reset_complete     = false;
-    time_t start            = time(NULL);
-    while (time(NULL) - start < 5) {
+    struct timespec start;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    while (elapsed_ms(&start) < RESET_TIMEOUT_MS) {
         // Check sysfs presence
         if (access(sysfs_path, F_OK) == 0) {
             if (device_disappeared) {
@@ -117,7 +121,7 @@ int tt_reset(const tt_device_t *dev) {
         } else {
             device_disappeared = true;
         }
-        usleep(100000);
+        usleep(POLL_INTERVAL_US);
     }
     if (!reset_complete)
         return close(fd), tt_fail(ETIMEDOUT);
