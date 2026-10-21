@@ -16,9 +16,12 @@
 
 _Thread_local sigjmp_buf tt_trap_jmp;
 
-// Guarded address range, empty while disarmed
-static _Thread_local const volatile uint8_t *armed_ptr = NULL;
-static _Thread_local size_t armed_len                  = 0;
+// Guarded address range, empty while disarmed.
+//
+// Volatile, so arming and disarming stay ordered around the guarded access,
+// and the handler reads what the interrupted code last stored.
+static _Thread_local const volatile uint8_t *volatile armed_ptr = NULL;
+static _Thread_local volatile size_t armed_len                  = 0;
 
 // Previously installed handler, chained for unrelated faults
 static struct sigaction prev;
