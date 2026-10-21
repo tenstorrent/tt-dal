@@ -308,7 +308,7 @@ impl Window {
         if !offset.is_multiple_of(4) {
             return Err(PyValueError::new_err("offset must be 4-byte aligned"));
         }
-        if offset + 4 > tlb.raw.len {
+        if offset.checked_add(4).is_none_or(|end| end > tlb.raw.len) {
             return Err(PyIndexError::new_err("offset out of bounds"));
         }
         let ptr = tlb.raw.ptr;
@@ -326,7 +326,7 @@ impl Window {
         if !offset.is_multiple_of(8) {
             return Err(PyValueError::new_err("offset must be 8-byte aligned"));
         }
-        if offset + 8 > tlb.raw.len {
+        if offset.checked_add(8).is_none_or(|end| end > tlb.raw.len) {
             return Err(PyIndexError::new_err("offset out of bounds"));
         }
         let ptr = tlb.raw.ptr;
@@ -359,7 +359,7 @@ impl Window {
         if !offset.is_multiple_of(4) {
             return Err(PyValueError::new_err("offset must be 4-byte aligned"));
         }
-        if offset + 4 > tlb.raw.len {
+        if offset.checked_add(4).is_none_or(|end| end > tlb.raw.len) {
             return Err(PyIndexError::new_err("offset out of bounds"));
         }
         let ptr = tlb.raw.ptr;
@@ -378,7 +378,7 @@ impl Window {
         if !offset.is_multiple_of(8) {
             return Err(PyValueError::new_err("offset must be 8-byte aligned"));
         }
-        if offset + 8 > tlb.raw.len {
+        if offset.checked_add(8).is_none_or(|end| end > tlb.raw.len) {
             return Err(PyIndexError::new_err("offset out of bounds"));
         }
         let ptr = tlb.raw.ptr;
