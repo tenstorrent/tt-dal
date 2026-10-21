@@ -228,7 +228,7 @@ impl Session {
                 if !(res.is_err() && crate::err::lost()) {
                     return res;
                 }
-                self.reopen()?;
+                Python::attach(|py| self.reopen(py))?;
                 res = op(&raw const self.raw);
             }
             if res.is_err() && crate::err::lost() {
@@ -288,10 +288,30 @@ impl Session {
     /// - `ENODEV` if the device could not be reopened.
     /// - `EAGAIN` if the session was opened with `nonblocking` and another
     ///   client holds the device incompatibly.
-    pub fn reopen(&mut self) -> PyResult<()> {
-        // SAFETY: `self.raw` is an initialized session. tt_reopen closes the
-        // stale descriptor and reopens the device with the session's flags.
-        crate::err::check(unsafe { ffi::tt_reopen(self.as_mut_ptr()) })
+    ///
+    /// A blocking reopen waits for as long as another client holds the device,
+    /// so this releases the interpreter lock while it waits.
+    pub fn reopen(&mut self, py: Python<'_>) -> PyResult<()> {
+        // Reopened on a copy of the handle so the wait can run without the
+        // interpreter lock.
+        let raw = self.raw;
+        let (rc, errno, raw) = py.detach(move || {
+            let mut raw = raw;
+            // SAFETY: `raw` is an initialized session. tt_reopen closes the
+            // stale descriptor and reopens the device with the session's
+            // flags.
+            let rc = unsafe { ffi::tt_reopen(&raw mut raw) };
+            // Read here, before reattaching can clobber it.
+            let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+            (rc, errno, raw)
+        });
+
+        // Kept on failure too, since the stale descriptor is closed either way
+        self.raw = raw;
+        if rc != 0 {
+            return Err(crate::err::fail(errno));
+        }
+        Ok(())
     }
 
     /// Returns the underlying device descriptor.
