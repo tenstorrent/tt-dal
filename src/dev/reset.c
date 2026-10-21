@@ -14,9 +14,9 @@
 #include <time.h>
 #include <unistd.h>
 
-#define RESET_TIMEOUT_MS 5000      // budget for the device to signal completion
-#define POLL_INTERVAL_US 100000    // sleep between completion checks
-#define POST_RESET_DELAY_US 500000 // firmware time to publish telemetry
+#define RESET_TIMEOUT_MS 5000   // budget for the device to signal completion
+#define POLL_INTERVAL_US 100000 // sleep between completion checks
+#define POST_RESET_DELAY_MS 500 // firmware time to publish telemetry
 
 /// Reset device.
 ///
@@ -134,7 +134,9 @@ int tt_reset(const tt_device_t *dev) {
     // is left without telemetry until the next reset or a module reload.
     //
     // FIXME: Remove once tt-kmd waits for firmware itself.
-    usleep(POST_RESET_DELAY_US);
+    struct timespec delay = { .tv_nsec = POST_RESET_DELAY_MS * 1000000L };
+    while (nanosleep(&delay, &delay) < 0 && errno == EINTR)
+        continue; // resume the rest after a handled signal
 
     // Issue post-reset on the surviving fd
     req.in.flags = TENSTORRENT_RESET_DEVICE_POST_RESET;
