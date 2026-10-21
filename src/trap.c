@@ -48,15 +48,21 @@ static void handler(int sig, siginfo_t *info, void *ctx) {
     }
 
     // Chain to the previous handler
-    if (prev.sa_flags & SA_SIGINFO)
-        return prev.sa_sigaction(sig, info, ctx);
-    if (prev.sa_handler == SIG_IGN)
+    if (prev.sa_handler != SIG_DFL && prev.sa_handler != SIG_IGN) {
+        if (prev.sa_flags & SA_SIGINFO)
+            prev.sa_sigaction(sig, info, ctx);
+        else
+            prev.sa_handler(sig);
         return;
-    if (prev.sa_handler != SIG_DFL)
-        return prev.sa_handler(sig);
+    }
 
-    // Restore the default disposition and re-raise
-    sigaction(SIGBUS, &prev, NULL);
+    // Restore the default disposition and re-raise.
+    //
+    // A fault is fatal even with `SIGBUS` ignored, so an ignored disposition
+    // takes the default action as well.
+    struct sigaction dfl = { .sa_handler = SIG_DFL };
+    sigemptyset(&dfl.sa_mask);
+    sigaction(SIGBUS, &dfl, NULL);
     raise(SIGBUS);
 }
 
