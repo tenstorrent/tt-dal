@@ -7,6 +7,12 @@
 #include <pthread.h>
 #include <signal.h>
 #include <stdint.h>
+#include <unistd.h>
+
+// Signals sent with `raise()` report `SI_TKILL` on Linux
+#ifndef SI_TKILL
+#define SI_TKILL SI_USER
+#endif
 
 _Thread_local sigjmp_buf tt_trap_jmp;
 
@@ -23,6 +29,16 @@ static pthread_once_t once = PTHREAD_ONCE_INIT;
 /// The signal is synchronous, so it is delivered on the faulting thread
 /// and the thread-local armed range identifies whether the fault is ours.
 static void handler(int sig, siginfo_t *info, void *ctx) {
+    // Let a re-raised fault happen again.
+    //
+    // A handler installed after this one, such as Python's `faulthandler`,
+    // may restore this one and re-raise the signal to its own thread, which
+    // then carries no fault address. Returning lets the access fault again
+    // with its address.
+    if (armed_ptr != NULL && info->si_code == SI_TKILL &&
+        info->si_pid == getpid())
+        return;
+
     // Recover a fault inside the armed range
     const uint8_t *addr = info->si_addr;
     const uint8_t *base = (const uint8_t *)armed_ptr;
