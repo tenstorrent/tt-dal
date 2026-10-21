@@ -15,6 +15,7 @@ foreach(src ${SOURCES})
         ${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/src
     )
     target_link_libraries(${target} PRIVATE ttdal)
+    target_compile_options(${target} PRIVATE -UNDEBUG)
     add_test(NAME ${name} COMMAND ${target})
     list(APPEND TARGETS ${target})
     set_property(GLOBAL APPEND PROPERTY FORMATTED ${CMAKE_CURRENT_SOURCE_DIR}/${src})
