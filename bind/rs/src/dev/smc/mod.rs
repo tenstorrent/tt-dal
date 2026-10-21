@@ -52,27 +52,28 @@ impl Session {
     /// message is dropped on any early return, leaving the session free to
     /// send again.
     ///
+    /// A persistent session does not reopen and retry a call, since a message
+    /// that ran before the reset would run twice.
+    ///
     /// # Errors
     ///
     /// Returns [`Err`] if the session is closed, a message is already
     /// outstanding, the wait times out, or the firmware has no message queue.
     pub fn call(&self, req: Message, timeout: Option<Duration>) -> Result<Message> {
         let timeout = msg::millis(timeout);
-        self.perform(|sess| {
-            let req = ffi::tt_smc_msg_t {
-                message: req.message,
-            };
-            let mut rsp = ffi::tt_smc_msg_t { message: [0; 8] };
+        let req = ffi::tt_smc_msg_t {
+            message: req.message,
+        };
+        let mut rsp = ffi::tt_smc_msg_t { message: [0; 8] };
 
-            // SAFETY: `sess` is an open device, and `req` and `rsp` are valid
-            // `tt_smc_msg_t`s.
-            err::check(unsafe {
-                ffi::tt_smc_call(sess.as_ptr(), &raw const req, &raw mut rsp, timeout)
-            })?;
+        // SAFETY: `self` is an open device, and `req` and `rsp` are valid
+        // `tt_smc_msg_t`s.
+        err::check(unsafe {
+            ffi::tt_smc_call(self.as_ptr(), &raw const req, &raw mut rsp, timeout)
+        })?;
 
-            Ok(Message {
-                message: rsp.message,
-            })
+        Ok(Message {
+            message: rsp.message,
         })
     }
 

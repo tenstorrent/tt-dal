@@ -430,6 +430,9 @@ impl OpenOptions {
     /// descriptor. A device that is truly gone surfaces as the reopen's
     /// `ENODEV`, never as [`ConnectionReset`].
     ///
+    /// SMC calls are never retried, since a message that ran before the
+    /// reset would run twice.
+    ///
     /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
     pub fn persistent(&mut self, persist: bool) -> &mut Self {
         self.persist = persist;
