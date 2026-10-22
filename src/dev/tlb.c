@@ -154,16 +154,17 @@ int tt_tlb_free(const tt_session_t *sess, tt_tlb_t *tlb) {
     if (!sess || !tlb)
         return tt_fail(EINVAL);
 
-    // Ensure session is open
-    if (sess->fd < 0)
-        return tt_fail(ENOTCONN);
-
     // Unmap TLB.
     //
-    // Skip if unconfigured (nothing to unmap).
+    // Skip if unconfigured (nothing to unmap). Unmapped even on a closed
+    // session, since a live mapping holds the descriptor open in the driver.
     if (tlb->ptr != NULL && munmap(tlb->ptr, tlb->len) != 0)
         return TT_ERR;
     tlb->ptr = NULL;
+
+    // Ensure session is open
+    if (sess->fd < 0)
+        return tt_fail(ENOTCONN);
 
     // Free TLB
     struct tenstorrent_free_tlb free = {
