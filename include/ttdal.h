@@ -614,6 +614,10 @@ typedef struct tt_tlb_config {
 /// window (never bound) needs no unmap. On success the handle's `id` is
 /// cleared.
 ///
+/// The window is unmapped even if the session is no longer open. A live mapping
+/// keeps the closed descriptor alive in the driver, and with it the TLB and any
+/// exclusive hold on the device.
+///
 /// @param sess  Session handle.
 /// @param tlb   TLB handle.
 /// @return      0 on success, -1 on error (check `errno`).
