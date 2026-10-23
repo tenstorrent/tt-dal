@@ -83,6 +83,18 @@ pub enum Tag {
     AiClkArbMax,
     EnabledMinArb,
     EnabledMaxArb,
+    AiClkPpmInfo,
+    HostAiClkLimit,
+    SmbusErrors,
+    GddrMriscNoc2AxiPort,
+    GddrWestIoPower,
+    GddrEastIoPower,
+    KernelThrottler,
+    NopStartCount,
+    NopOnDuration,
+    FwCapabilities0,
+    FwActiveConfig0,
+    FlashJedecId,
 }
 
 impl Tag {
@@ -156,6 +168,18 @@ impl Tag {
             Self::AiClkArbMax => ffi::TT_TAG_AICLK_ARB_MAX,
             Self::EnabledMinArb => ffi::TT_TAG_ENABLED_MIN_ARB,
             Self::EnabledMaxArb => ffi::TT_TAG_ENABLED_MAX_ARB,
+            Self::AiClkPpmInfo => ffi::TT_TAG_AICLK_PPM_INFO,
+            Self::HostAiClkLimit => ffi::TT_TAG_HOST_AICLK_LIMIT,
+            Self::SmbusErrors => ffi::TT_TAG_SMBUS_ERRORS,
+            Self::GddrMriscNoc2AxiPort => ffi::TT_TAG_GDDR_MRISC_NOC2AXI_PORT,
+            Self::GddrWestIoPower => ffi::TT_TAG_GDDR_WEST_IO_POWER,
+            Self::GddrEastIoPower => ffi::TT_TAG_GDDR_EAST_IO_POWER,
+            Self::KernelThrottler => ffi::TT_TAG_KERNEL_THROTTLER,
+            Self::NopStartCount => ffi::TT_TAG_NOP_START_COUNT,
+            Self::NopOnDuration => ffi::TT_TAG_NOP_ON_DURATION,
+            Self::FwCapabilities0 => ffi::TT_TAG_FW_CAPABILITIES_0,
+            Self::FwActiveConfig0 => ffi::TT_TAG_FW_ACTIVE_CONFIG_0,
+            Self::FlashJedecId => ffi::TT_TAG_FLASH_JEDEC_ID,
         }
     }
 }

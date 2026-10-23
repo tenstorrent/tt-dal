@@ -804,141 +804,141 @@ tt_smc_wait(const tt_session_t *sess, tt_smc_msg_t *rsp, uint32_t timeout);
 /// Telemetry tags.
 typedef enum tt_telemetry_tag {
     /// Invalid/reserved tag (index 0 is unused).
-    TT_TAG_INVALID              = 0,
+    TT_TAG_INVALID                 = 0,
     /// High part of the board ID.
-    TT_TAG_BOARD_ID_HIGH        = 1,
+    TT_TAG_BOARD_ID_HIGH           = 1,
     /// Low part of the board ID.
-    TT_TAG_BOARD_ID_LOW         = 2,
+    TT_TAG_BOARD_ID_LOW            = 2,
     /// ASIC ID.
-    TT_TAG_ASIC_ID              = 3,
+    TT_TAG_ASIC_ID                 = 3,
     /// Harvesting state of the system.
-    TT_TAG_HARVESTING_STATE     = 4,
+    TT_TAG_HARVESTING_STATE        = 4,
     /// Update interval for telemetry in milliseconds.
-    TT_TAG_UPDATE_TELEM_SPEED   = 5,
+    TT_TAG_UPDATE_TELEM_SPEED      = 5,
     /// VCore voltage in millivolts.
-    TT_TAG_VCORE                = 6,
+    TT_TAG_VCORE                   = 6,
     /// Thermal design power (TDP) in watts.
-    TT_TAG_TDP                  = 7,
+    TT_TAG_TDP                     = 7,
     /// Thermal design current (TDC) in amperes.
-    TT_TAG_TDC                  = 8,
+    TT_TAG_TDC                     = 8,
     /// VDD limits (min and max) in millivolts.
-    TT_TAG_VDD_LIMITS           = 9,
+    TT_TAG_VDD_LIMITS              = 9,
     /// Thermal shutdown limit in degrees Celsius.
-    TT_TAG_THM_LIMIT_SHUTDOWN   = 10,
+    TT_TAG_THM_LIMIT_SHUTDOWN      = 10,
     /// ASIC temperature in signed 16.16 fixed-point format.
-    TT_TAG_ASIC_TEMPERATURE     = 11,
+    TT_TAG_ASIC_TEMPERATURE        = 11,
     /// Voltage regulator temperature in degrees Celsius (not implemented).
-    TT_TAG_VREG_TEMPERATURE     = 12,
+    TT_TAG_VREG_TEMPERATURE        = 12,
     /// Board temperature in degrees Celsius (not implemented).
-    TT_TAG_BOARD_TEMPERATURE    = 13,
+    TT_TAG_BOARD_TEMPERATURE       = 13,
     /// AI clock frequency in megahertz.
-    TT_TAG_AICLK                = 14,
+    TT_TAG_AICLK                   = 14,
     /// AXI clock frequency in megahertz.
-    TT_TAG_AXICLK               = 15,
+    TT_TAG_AXICLK                  = 15,
     /// SMC clock frequency in megahertz.
-    TT_TAG_SMCCLK               = 16,
+    TT_TAG_SMCCLK                  = 16,
     /// L2CPU clock 0 frequency in megahertz.
-    TT_TAG_L2CPUCLK0            = 17,
+    TT_TAG_L2CPUCLK0               = 17,
     /// L2CPU clock 1 frequency in megahertz.
-    TT_TAG_L2CPUCLK1            = 18,
+    TT_TAG_L2CPUCLK1               = 18,
     /// L2CPU clock 2 frequency in megahertz.
-    TT_TAG_L2CPUCLK2            = 19,
+    TT_TAG_L2CPUCLK2               = 19,
     /// L2CPU clock 3 frequency in megahertz.
-    TT_TAG_L2CPUCLK3            = 20,
+    TT_TAG_L2CPUCLK3               = 20,
     /// Ethernet live status.
-    TT_TAG_ETH_LIVE_STATUS      = 21,
+    TT_TAG_ETH_LIVE_STATUS         = 21,
     /// GDDR status.
-    TT_TAG_GDDR_STATUS          = 22,
+    TT_TAG_GDDR_STATUS             = 22,
     /// GDDR speed in megabits per second.
-    TT_TAG_GDDR_SPEED           = 23,
+    TT_TAG_GDDR_SPEED              = 23,
     /// Ethernet firmware version.
-    TT_TAG_ETH_FW_VERSION       = 24,
+    TT_TAG_ETH_FW_VERSION          = 24,
     /// GDDR firmware version.
-    TT_TAG_GDDR_FW_VERSION      = 25,
+    TT_TAG_GDDR_FW_VERSION         = 25,
     /// DM application firmware version.
-    TT_TAG_DM_APP_FW_VERSION    = 26,
+    TT_TAG_DM_APP_FW_VERSION       = 26,
     /// DM bootloader firmware version.
-    TT_TAG_DM_BL_FW_VERSION     = 27,
+    TT_TAG_DM_BL_FW_VERSION        = 27,
     /// Flash bundle version.
-    TT_TAG_FLASH_BUNDLE_VERSION = 28,
+    TT_TAG_FLASH_BUNDLE_VERSION    = 28,
     /// CM firmware version.
-    TT_TAG_CM_FW_VERSION        = 29,
+    TT_TAG_CM_FW_VERSION           = 29,
     /// L2CPU firmware version.
-    TT_TAG_L2CPU_FW_VERSION     = 30,
+    TT_TAG_L2CPU_FW_VERSION        = 30,
     /// Fan speed as a percentage.
-    TT_TAG_FAN_SPEED            = 31,
+    TT_TAG_FAN_SPEED               = 31,
     /// Timer heartbeat counter.
-    TT_TAG_TIMER_HEARTBEAT      = 32,
+    TT_TAG_TIMER_HEARTBEAT         = 32,
     /// Total number of telemetry tags.
-    TT_TAG_TELEM_ENUM_COUNT     = 33,
+    TT_TAG_TELEM_ENUM_COUNT        = 33,
     /// Enabled Tensix columns.
-    TT_TAG_ENABLED_TENSIX_COL   = 34,
+    TT_TAG_ENABLED_TENSIX_COL      = 34,
     /// Enabled Ethernet interfaces.
-    TT_TAG_ENABLED_ETH          = 35,
+    TT_TAG_ENABLED_ETH             = 35,
     /// Enabled GDDR interfaces.
-    TT_TAG_ENABLED_GDDR         = 36,
+    TT_TAG_ENABLED_GDDR            = 36,
     /// Enabled L2CPU cores.
-    TT_TAG_ENABLED_L2CPU        = 37,
+    TT_TAG_ENABLED_L2CPU           = 37,
     /// PCIe usage information.
-    TT_TAG_PCIE_USAGE           = 38,
+    TT_TAG_PCIE_USAGE              = 38,
     /// Input current in amperes.
-    TT_TAG_INPUT_CURRENT        = 39,
+    TT_TAG_INPUT_CURRENT           = 39,
     /// NOC translation status.
-    TT_TAG_NOC_TRANSLATION      = 40,
+    TT_TAG_NOC_TRANSLATION         = 40,
     /// Fan RPM.
-    TT_TAG_FAN_RPM              = 41,
+    TT_TAG_FAN_RPM                 = 41,
     /// GDDR 0 and 1 temperature.
-    TT_TAG_GDDR_0_1_TEMP        = 42,
+    TT_TAG_GDDR_0_1_TEMP           = 42,
     /// GDDR 2 and 3 temperature.
-    TT_TAG_GDDR_2_3_TEMP        = 43,
+    TT_TAG_GDDR_2_3_TEMP           = 43,
     /// GDDR 4 and 5 temperature.
-    TT_TAG_GDDR_4_5_TEMP        = 44,
+    TT_TAG_GDDR_4_5_TEMP           = 44,
     /// GDDR 6 and 7 temperature.
-    TT_TAG_GDDR_6_7_TEMP        = 45,
+    TT_TAG_GDDR_6_7_TEMP           = 45,
     /// GDDR 0 and 1 corrected errors.
-    TT_TAG_GDDR_0_1_CORR_ERRS   = 46,
+    TT_TAG_GDDR_0_1_CORR_ERRS      = 46,
     /// GDDR 2 and 3 corrected errors.
-    TT_TAG_GDDR_2_3_CORR_ERRS   = 47,
+    TT_TAG_GDDR_2_3_CORR_ERRS      = 47,
     /// GDDR 4 and 5 corrected errors.
-    TT_TAG_GDDR_4_5_CORR_ERRS   = 48,
+    TT_TAG_GDDR_4_5_CORR_ERRS      = 48,
     /// GDDR 6 and 7 corrected errors.
-    TT_TAG_GDDR_6_7_CORR_ERRS   = 49,
+    TT_TAG_GDDR_6_7_CORR_ERRS      = 49,
     /// GDDR uncorrected errors.
-    TT_TAG_GDDR_UNCORR_ERRS     = 50,
+    TT_TAG_GDDR_UNCORR_ERRS        = 50,
     /// Maximum GDDR temperature.
-    TT_TAG_MAX_GDDR_TEMP        = 51,
+    TT_TAG_MAX_GDDR_TEMP           = 51,
     /// ASIC location.
-    TT_TAG_ASIC_LOCATION        = 52,
+    TT_TAG_ASIC_LOCATION           = 52,
     /// Board power limit in watts.
-    TT_TAG_BOARD_POWER_LIMIT    = 53,
+    TT_TAG_BOARD_POWER_LIMIT       = 53,
     /// Input power in watts.
-    TT_TAG_INPUT_POWER          = 54,
+    TT_TAG_INPUT_POWER             = 54,
     /// Maximum TDC limit in amperes.
-    TT_TAG_TDC_LIMIT_MAX        = 55,
+    TT_TAG_TDC_LIMIT_MAX           = 55,
     /// Thermal throttle limit in degrees Celsius.
-    TT_TAG_THM_LIMIT_THROTTLE   = 56,
+    TT_TAG_THM_LIMIT_THROTTLE      = 56,
     /// Firmware build date.
-    TT_TAG_FW_BUILD_DATE        = 57,
+    TT_TAG_FW_BUILD_DATE           = 57,
     /// TT flash version.
-    TT_TAG_TT_FLASH_VERSION     = 58,
+    TT_TAG_TT_FLASH_VERSION        = 58,
     /// Enabled Tensix rows.
-    TT_TAG_ENABLED_TENSIX_ROW   = 59,
+    TT_TAG_ENABLED_TENSIX_ROW      = 59,
     /// Thermal trip count.
-    TT_TAG_THERM_TRIP_COUNT     = 60,
+    TT_TAG_THERM_TRIP_COUNT        = 60,
     /// High part of the ASIC ID.
-    TT_TAG_ASIC_ID_HIGH         = 61,
+    TT_TAG_ASIC_ID_HIGH            = 61,
     /// Low part of the ASIC ID.
-    TT_TAG_ASIC_ID_LOW          = 62,
+    TT_TAG_ASIC_ID_LOW             = 62,
     /// Maximum AI clock frequency.
-    TT_TAG_AICLK_LIMIT_MAX      = 63,
+    TT_TAG_AICLK_LIMIT_MAX         = 63,
     /// Maximum TDP limit in watts.
-    TT_TAG_TDP_LIMIT_MAX        = 64,
+    TT_TAG_TDP_LIMIT_MAX           = 64,
     /// Effective minimum AICLK arbiter value in megahertz.
     ///
     /// This represents the highest frequency requested by all enabled
     /// minimum arbiters. Multiple arbiters may request minimum
     /// frequencies, and the highest value is effective.
-    TT_TAG_AICLK_ARB_MIN        = 65,
+    TT_TAG_AICLK_ARB_MIN           = 65,
     /// Effective maximum AICLK arbiter value in megahertz.
     ///
     /// This represents the lowest frequency limit imposed by all
@@ -947,17 +947,69 @@ typedef enum tt_telemetry_tag {
     /// lowest (most restrictive) value is effective. This value takes
     /// precedence over TT_TAG_AICLK_ARB_MIN when determining the
     /// final target frequency.
-    TT_TAG_AICLK_ARB_MAX        = 66,
+    TT_TAG_AICLK_ARB_MAX           = 66,
     /// Bitmask of enabled minimum arbiters.
     ///
     /// Each bit represents whether a specific minimum frequency arbiter is
     /// currently enabled.
-    TT_TAG_ENABLED_MIN_ARB      = 67,
+    TT_TAG_ENABLED_MIN_ARB         = 67,
     /// Bitmask of enabled maximum arbiters.
     ///
     /// Each bit represents whether a specific maximum frequency arbiter is
     /// currently enabled.
-    TT_TAG_ENABLED_MAX_ARB      = 68,
+    TT_TAG_ENABLED_MAX_ARB         = 68,
+    /// Information on the currently set AICLK value.
+    ///
+    /// Contains details about why a particular target frequency was
+    /// chosen, including which arbiter determined the frequency and the
+    /// reason for the decision.
+    TT_TAG_AICLK_PPM_INFO          = 69,
+    /// Host-adjustable AICLK fmax ceiling in megahertz.
+    ///
+    /// Set by the host through the SMC. A value of 0 indicates the host
+    /// has not set a limit.
+    TT_TAG_HOST_AICLK_LIMIT        = 70,
+    /// Number of SMBus target errors observed.
+    TT_TAG_SMBUS_ERRORS            = 71,
+    /// noc2axi port MRISC firmware is loaded on, per GDDR instance.
+    ///
+    /// Nibble i is the port (0, 1 or 2) for GDDR instance i, with
+    /// instance 0 in the least significant nibble. A nibble of 0xF marks
+    /// a disabled or harvested instance.
+    TT_TAG_GDDR_MRISC_NOC2AXI_PORT = 72,
+    /// GDDR west IO rail power in watts.
+    TT_TAG_GDDR_WEST_IO_POWER      = 73,
+    /// GDDR east IO rail power in watts.
+    TT_TAG_GDDR_EAST_IO_POWER      = 74,
+    /// Kernel-throttler-at-AICLK-floor configuration.
+    ///
+    /// Reflects the persisted firmware table configuration, which may be
+    /// overridden through the `ccfgovr` SPI flash banks:
+    /// - bit 0: feature enabled (1) or disabled (0)
+    /// - bits [31:16]: stop-NOPs frequency in MHz (0 = firmware default)
+    TT_TAG_KERNEL_THROTTLER        = 75,
+    /// Number of times kernel NOP throttling has started since boot.
+    TT_TAG_NOP_START_COUNT         = 76,
+    /// Time kernel NOP throttling was active during the last telemetry
+    /// update window, in milliseconds.
+    TT_TAG_NOP_ON_DURATION         = 77,
+    /// Firmware capability bitfield.
+    ///
+    /// - bit 0: firmware supports the kernel-throttler-at-AICLK-floor
+    ///   feature.
+    /// - bit 1: firmware supports the GDDR thermal-trip action.
+    TT_TAG_FW_CAPABILITIES_0       = 78,
+    /// Active firmware configuration bitfield.
+    ///
+    /// Same bit assignments as `TT_TAG_FW_CAPABILITIES_0`, set when the
+    /// corresponding feature is currently enabled.
+    TT_TAG_FW_ACTIVE_CONFIG_0      = 79,
+    /// JEDEC ID of the SPI flash.
+    ///
+    /// The three ID bytes returned by the RDID (9Fh) command, packed as
+    /// `0x00MMTTCC`: MM = manufacturer, TT = memory type, CC = capacity.
+    /// 0 if the ID could not be read.
+    TT_TAG_FLASH_JEDEC_ID          = 80,
     /// Sentinel value for telemetry array length.
     TT_TELEMETRY_LEN,
 } tt_telemetry_tag_t;

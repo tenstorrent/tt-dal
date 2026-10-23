@@ -105,6 +105,18 @@ pub enum Tag {
     AiClkArbMax = ffi::TT_TAG_AICLK_ARB_MAX,
     EnabledMinArb = ffi::TT_TAG_ENABLED_MIN_ARB,
     EnabledMaxArb = ffi::TT_TAG_ENABLED_MAX_ARB,
+    AiClkPpmInfo = ffi::TT_TAG_AICLK_PPM_INFO,
+    HostAiClkLimit = ffi::TT_TAG_HOST_AICLK_LIMIT,
+    SmbusErrors = ffi::TT_TAG_SMBUS_ERRORS,
+    GddrMriscNoc2AxiPort = ffi::TT_TAG_GDDR_MRISC_NOC2AXI_PORT,
+    GddrWestIoPower = ffi::TT_TAG_GDDR_WEST_IO_POWER,
+    GddrEastIoPower = ffi::TT_TAG_GDDR_EAST_IO_POWER,
+    KernelThrottler = ffi::TT_TAG_KERNEL_THROTTLER,
+    NopStartCount = ffi::TT_TAG_NOP_START_COUNT,
+    NopOnDuration = ffi::TT_TAG_NOP_ON_DURATION,
+    FwCapabilities0 = ffi::TT_TAG_FW_CAPABILITIES_0,
+    FwActiveConfig0 = ffi::TT_TAG_FW_ACTIVE_CONFIG_0,
+    FlashJedecId = ffi::TT_TAG_FLASH_JEDEC_ID,
 }
 
 /// A snapshot of device telemetry values, indexed by [`Tag`].
