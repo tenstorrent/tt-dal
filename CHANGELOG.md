@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2]
+
+### Bug Fixes
+
+- *(reset)* Post-reset races firmware boot
+- *(reset)* Time out on monotonic clock
+- *(reset)* Restart sleep after signal
+- *(reset)* Prevent fd leak on exec
+- *(trap)* Recover re-raised faults
+- *(trap)* Take default action when ignored
+- *(trap)* Make armed range volatile
+- *(bind/py)* Use checked bounds arithmetic
+- *(bind/py)* Take tag numbers from C
+- *(bind/rs)* Prevent message retry on reset
+- *(bind/py)* Raise on concurrent borrow
+- *(bind/py)* Unblock threads during reopen
+- *(tlb)* Unmap on closed session
+
+### Continuous Integration
+
+- *(release)* Restrict to main
+- *(release)* Reword version input
+
+### Documentation
+
+- *(readme)* Add package badges
+
+### Testing
+
+- *(trap)* Initial tests
+- *(ctest)* Keep asserts in release
+
 ## [0.1.1]
 
 ### Bug Fixes
@@ -113,6 +145,7 @@ All notable changes to this project will be documented in this file.
 - *(cargo)* Initial tests
 - *(ctest)* Initial tests
 
+[0.1.2]: https://github.com/tenstorrent/tt-dal/compare/v0.1.1..v0.1.2
 [0.1.1]: https://github.com/tenstorrent/tt-dal/compare/v0.1.0..v0.1.1
 [0.1.0]: https://github.com/tenstorrent/tt-dal/tree/v0.1.0
 
