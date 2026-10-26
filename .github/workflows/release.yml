@@ -79,5 +79,6 @@ jobs:
           git commit --message "chore(release): v$VERSION"
           git push origin "$branch"
           git cliff --unreleased --tag "v$VERSION" --strip all > notes.md
-          gh pr create --base main --head "$branch" \
-            --title "chore(release): v$VERSION" --body-file notes.md
+          url=$(gh pr create --base main --head "$branch" \
+            --title "chore(release): v$VERSION" --body-file notes.md)
+          echo "::notice title=Pull request::$url"
