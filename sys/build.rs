@@ -54,6 +54,8 @@ fn main() {
         .clang_args([
             &format!("-I{}/include", dst.display()),
             "-fretain-comments-from-system-headers",
+            // The header uses C23 attributes, which older libclang rejects by default.
+            "-std=c2x",
         ])
         .generate_comments(true)
         .prepend_enum_name(false)
