@@ -17,7 +17,7 @@
  * The header uses C23 attributes, so consumers need C23 (or C++17 for C++
  * consumers).
  *
- * @version 0.1.1
+ * @version 0.1.2
  * @copyright Copyright (c) 2026 Tenstorrent Inc.
  */
 
@@ -45,7 +45,7 @@ typedef struct tt_session tt_session_t;
 /// Minor version definition.
 #define TTDAL_VERSION_MINOR 1
 /// Patch version definition.
-#define TTDAL_VERSION_PATCH 1
+#define TTDAL_VERSION_PATCH 2
 
 /// Semantic version.
 typedef struct tt_version {
