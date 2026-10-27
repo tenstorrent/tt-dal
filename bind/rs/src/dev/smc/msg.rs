@@ -14,9 +14,10 @@ use crate::{Result, err};
 /// SMC message.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Message {
-    /// Message words. Word 0 is the header (message code in the low byte plus
-    /// any per-message packed fields, and the firmware status on a response);
-    /// words 1 through 7 carry the request arguments or the response data.
+    /// Message words. Word 0 is the header: the message code in its low byte
+    /// plus any per-message packed fields, and the firmware status on a
+    /// response. Words 1 through 7 carry the request arguments or the response
+    /// data.
     pub message: [u32; 8],
 }
 
@@ -35,7 +36,7 @@ pub struct Message {
 pub struct Queued<'sess> {
     /// Session the message was posted on.
     sess: &'sess mut Session,
-    /// Whether the reply has been taken, so the drop is a no-op.
+    /// Whether the message has been consumed, so the drop is a no-op.
     done: bool,
 }
 
@@ -46,7 +47,7 @@ impl<'sess> Queued<'sess> {
             message: req.message,
         };
 
-        // SAFETY: `sess` is an open device and `req` is a valid
+        // SAFETY: `sess` is an open session and `req` is a valid
         // `tt_smc_msg_t`.
         err::check(unsafe { ffi::tt_smc_post(sess.as_ptr(), &raw const req) })?;
 
@@ -66,7 +67,7 @@ impl<'sess> Queued<'sess> {
     pub fn wait(&mut self, timeout: Option<Duration>) -> Result<Message> {
         let mut rsp = ffi::tt_smc_msg_t { message: [0; 8] };
 
-        // SAFETY: `sess` is an open device and `rsp` is a valid
+        // SAFETY: `sess` is an open session and `rsp` is a valid
         // `tt_smc_msg_t`.
         let res = err::check(unsafe {
             ffi::tt_smc_wait(self.sess.as_ptr(), &raw mut rsp, millis(timeout))
@@ -95,7 +96,7 @@ impl<'sess> Queued<'sess> {
     pub fn try_wait(&mut self) -> Result<Message> {
         let mut rsp = ffi::tt_smc_msg_t { message: [0; 8] };
 
-        // SAFETY: `sess` is an open device and `rsp` is a valid
+        // SAFETY: `sess` is an open session and `rsp` is a valid
         // `tt_smc_msg_t`.
         let res = err::check(unsafe { ffi::tt_smc_poll(self.sess.as_ptr(), &raw mut rsp) });
         self.settle(&res, io::ErrorKind::WouldBlock);
@@ -122,7 +123,7 @@ impl<'sess> Queued<'sess> {
 impl Drop for Queued<'_> {
     fn drop(&mut self) {
         if !self.done {
-            // SAFETY: `sess` is an open device. The ioctl always succeeds, so
+            // SAFETY: `sess` is an open session. The ioctl always succeeds, so
             // there is nothing to report.
             let _ = unsafe { ffi::tt_smc_drop(self.sess.as_ptr()) };
         }

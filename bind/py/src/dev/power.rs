@@ -5,19 +5,19 @@
 //! Power state.
 //!
 //! Controls which power features are requested to be active on the device. Each
-//! `Flag` value corresponds to a single feature, enabled when present and
-//! disabled when absent.
+//! feature has its own `Flag` and is enabled when that flag is present and
+//! disabled when it is absent.
 //!
 //! The kernel driver aggregates power requests across all open sessions. A
-//! feature stays enabled as long as any session requests it and is withdrawn
-//! automatically when that session closes.
+//! feature stays enabled as long as any session requests it, and a session's
+//! request is withdrawn automatically when it closes.
 
 use crate::ffi;
 use pyo3::prelude::*;
 
 /// Power feature flag.
 ///
-/// A single controllable power feature on the device. Combine flags with `|`
+/// A set of controllable power features on the device. Combine flags with `|`
 /// and pass to `Session.power()` to request the desired power state.
 #[pyclass(skip_from_py_object)]
 #[derive(Clone, Copy)]
@@ -28,7 +28,7 @@ pub struct Flag(pub u16);
 impl Flag {
     /// AI clock selection.
     ///
-    /// Requests maximum AI clock frequency when set; minimum when clear.
+    /// Requests maximum AI clock frequency when set, and minimum when clear.
     #[classattr]
     fn MaxAiClk() -> Self {
         Self(ffi::TT_POWER_MAX_AI_CLK as u16)
@@ -36,7 +36,7 @@ impl Flag {
 
     /// GDDR PHY state.
     ///
-    /// Wakes up the GDDR PHY when set; powers it down when clear.
+    /// Wakes up the GDDR PHY when set, and powers it down when clear.
     #[classattr]
     fn MriscPhyWakeup() -> Self {
         Self(ffi::TT_POWER_MRISC_PHY_WAKEUP as u16)
@@ -44,7 +44,7 @@ impl Flag {
 
     /// Tensix core gating.
     ///
-    /// Enables Tensix cores when set; clock gates them when clear.
+    /// Enables Tensix cores when set, and clock gates them when clear.
     #[classattr]
     fn TensixEnable() -> Self {
         Self(ffi::TT_POWER_TENSIX_ENABLE as u16)
@@ -52,7 +52,7 @@ impl Flag {
 
     /// L2CPU clock gating.
     ///
-    /// Enables L2CPU when set; clock gates it when clear.
+    /// Enables L2CPU when set, and clock gates it when clear.
     #[classattr]
     fn L2CpuEnable() -> Self {
         Self(ffi::TT_POWER_L2CPU_ENABLE as u16)

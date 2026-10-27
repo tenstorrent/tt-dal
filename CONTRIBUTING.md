@@ -8,17 +8,18 @@ changes.
 
 This project is governed by the [Contributor Covenant](CODE_OF_CONDUCT.md). By
 participating, you are expected to uphold this code. Report unacceptable
-behavior to ospo@tenstorrent.com.
+behaviour to ospo@tenstorrent.com.
 
 ## Reporting Bugs
 
-Report bugs through [GitHub Issues](https://github.com/tenstorrent/tt-dal/issues).
-Before opening a new issue, search existing issues to avoid duplicates. A good
-report includes:
+Report bugs through [GitHub Issues][issues]. Before opening a new issue, search
+existing issues to avoid duplicates. A good report includes:
 
-- A clear description of the problem and the expected behavior.
+- A clear description of the problem and the expected behaviour.
 - Steps to reproduce, ideally as a minimal example.
 - The library version, device architecture, and kernel driver (KMD) version.
+
+[issues]: https://github.com/tenstorrent/tt-dal/issues
 
 Do not report security vulnerabilities through public issues. See
 [SECURITY.md](SECURITY.md) for the disclosure process.
@@ -36,10 +37,13 @@ requests are reviewed on a weekly cadence.
 ## Conventions
 
 - **Formatting**: C is formatted with `clang-format` and Rust with `cargo fmt`.
-  Run both before submitting. Continuous integration rejects unformatted code.
-- **Commit messages**: Follow the [Conventional Commits](https://www.conventionalcommits.org)
-  format (for example, `fix(pci): correct BDF field order`).
-- **Tests**: Add or update tests for any behavioral change. The C test suite
-  runs under CTest. The bindings are tested with `cargo test`.
+  Run both before submitting. Continuous integration rejects unformatted Rust
+  code.
+- **Commit messages**: Follow the [Conventional Commits][cc] format (for
+  example, `fix(pci): correct BDF field order`).
+- **Tests**: Add or update tests for any behavioural change. The C test suite
+  runs under CTest. The Rust bindings are tested with `cargo test`.
 - **Scope**: Keep pull requests focused. Unrelated changes belong in separate
   pull requests.
+
+[cc]: https://www.conventionalcommits.org

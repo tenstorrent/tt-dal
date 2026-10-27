@@ -20,7 +20,7 @@
 //! # let dev = Device::scan().unwrap().next().unwrap();
 //! #
 //! // Open a device session
-//! let mut con = Session::open(dev)?;
+//! let con = Session::open(dev)?;
 //!
 //! // Send a message, print the firmware status word
 //! # let req = Message::default();
@@ -57,8 +57,14 @@ impl Session {
     ///
     /// # Errors
     ///
-    /// Returns [`Err`] if the session is closed, a message is already
-    /// outstanding, the wait times out, or the firmware has no message queue.
+    /// Returns [`ConnectionReset`] if the session was severed by an out-of-band
+    /// device reset or removal, or [`InvalidInput`] if the driver is older than
+    /// `tt-kmd` 2.11. Returns [`Err`] if the session is closed, a message is
+    /// already outstanding, the wait times out, or the firmware has no message
+    /// queue.
+    ///
+    /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
+    /// [`InvalidInput`]: std::io::ErrorKind::InvalidInput
     pub fn call(&self, req: Message, timeout: Option<Duration>) -> Result<Message> {
         let timeout = msg::millis(timeout);
         let req = ffi::tt_smc_msg_t {
@@ -66,7 +72,7 @@ impl Session {
         };
         let mut rsp = ffi::tt_smc_msg_t { message: [0; 8] };
 
-        // SAFETY: `self` is an open device, and `req` and `rsp` are valid
+        // SAFETY: `self` is an open session, and `req` and `rsp` are valid
         // `tt_smc_msg_t`s.
         err::check(unsafe {
             ffi::tt_smc_call(self.as_ptr(), &raw const req, &raw mut rsp, timeout)
@@ -84,8 +90,13 @@ impl Session {
     ///
     /// # Errors
     ///
-    /// Returns [`Err`] if the session is closed, a message is already
-    /// outstanding, or the firmware has no message queue.
+    /// Returns [`ConnectionReset`] if the session was severed by an out-of-band
+    /// device reset or removal, or [`InvalidInput`] if the driver is older than
+    /// `tt-kmd` 2.11. Returns [`Err`] if the session is closed, a message is
+    /// already outstanding, or the firmware has no message queue.
+    ///
+    /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
+    /// [`InvalidInput`]: std::io::ErrorKind::InvalidInput
     pub fn post(&mut self, req: Message) -> Result<Queued<'_>> {
         Queued::post(self, req)
     }

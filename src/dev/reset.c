@@ -88,11 +88,11 @@ int tt_reset(const tt_device_t *dev) {
 
     // Wait for reset completion.
     //
-    // For in-place resets (device stays on bus), we check bit 6 of PCI
-    // command register (offset 4): the driver clears it when reset is done.
-    // If the device disappears from the bus (an out-of-band removal), wait
-    // for it to reappear. The post-reset ioctl below then fails loudly on
-    // the dead fd rather than targeting a re-probed instance.
+    // For in-place resets (device stays on bus), we check bit 6 of PCI command
+    // register (offset 4): the hardware clears it when reset is done. If the
+    // device disappears from the bus (an out-of-band removal), wait for it to
+    // reappear. The post-reset ioctl below then fails loudly on the dead fd
+    // rather than targeting a re-probed instance.
     bool device_disappeared = false;
     bool reset_complete     = false;
     struct timespec start;
@@ -129,9 +129,10 @@ int tt_reset(const tt_device_t *dev) {
     // Wait for firmware.
     //
     // Works around a defect in tt-kmd 2.11.0 and earlier: the post-reset
-    // `ioctl` probes firmware telemetry exactly once, and firmware publishes
-    // it about 350 ms after the marker clears. Issued any sooner, the driver
-    // is left without telemetry until the next reset or a module reload.
+    // `ioctl` probes firmware telemetry exactly once, and firmware publishes it
+    // about 350 ms after the marker clears. Issued any sooner, the `ioctl`
+    // leaves the driver without telemetry until the next reset or a module
+    // reload.
     //
     // FIXME: Remove once tt-kmd waits for firmware itself.
     struct timespec delay = { .tv_nsec = POST_RESET_DELAY_MS * 1000000L };

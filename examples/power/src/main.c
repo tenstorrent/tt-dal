@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Example: Interactive power state control for a Tenstorrent device
+// Example: Interactive power state control for Tenstorrent devices
 
 #include <errno.h>
 #include <libgen.h>
@@ -17,8 +17,8 @@
 
 // Resolve a device spec to a tt_device_t.
 //
-// Accepts a /dev/tenstorrent/N path or a PCI BDF string (DDDD:BB:DD.F or
-// BB:DD.F). Returns 0 with `dev->id` set, or -1 on error.
+// Accepts a /dev/tenstorrent/N path or a PCIe bus/device/function (BDF) string
+// (DDDD:BB:DD.F or BB:DD.F). Returns 0 with `dev->id` set, or -1 on error.
 static int device_from_spec(const char *spec, tt_device_t *dev) {
     if (strchr(spec, '/'))
         return tt_dev_from_path(spec, dev);
@@ -193,7 +193,7 @@ int main(int argc, char *argv[]) {
         // Toggle and apply to all devices.
         //
         // On any failure revert the `mask` and report. Partial failure leaves
-        // devices inconsistent but that is the operator's problem to fix.
+        // devices inconsistent, but that is the operator's problem to fix.
         uint16_t new_mask = mask ^ (uint16_t)FLAGS[idx].flag;
         int ok            = 1;
         for (int i = 0; i < ndevs; i++) {

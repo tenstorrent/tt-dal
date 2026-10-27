@@ -9,7 +9,7 @@
 BUILD ?= build
 
 
-# Build all targets
+# Build library
 .PHONY: all
 all: $(BUILD)/Makefile
 	@$(MAKE) -C $(BUILD)

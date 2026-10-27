@@ -123,7 +123,7 @@ impl<'dev> Tlb<'dev> {
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     #[doc(alias = "configure")]
     pub fn bind<'tlb>(&'tlb mut self, cfg: &Config) -> Result<Window<'tlb, 'dev>> {
-        // SAFETY: `self.dev.0` is an open device, `self.raw` is a TLB allocated
+        // SAFETY: `self.dev` is an open session, `self.raw` is a TLB allocated
         // by `tt_tlb_alloc`, and `cfg` is a valid configuration.
         err::check(unsafe { ffi::tt_tlb_bind(self.dev.as_ptr(), &raw mut self.raw, cfg) })?;
         Ok(Window { tlb: self })

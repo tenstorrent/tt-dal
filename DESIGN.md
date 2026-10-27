@@ -50,7 +50,7 @@ What this library explicitly **does not** provide:
 
 #### Device Representation
 
-Devices are modeled with two transparent structs: a cheap *descriptor* and an
+Devices are modelled with two transparent structs: a cheap *descriptor* and an
 owned *session*.
 
 ```c
@@ -121,16 +121,24 @@ localized.
 
 #### Kernel Driver Requirement
 
-**TL;DR**: Requires `tt-kmd` >= 2.10. Documented, not enforced at runtime.
+**TL;DR**: Requires `tt-kmd` >= 2.10, and 2.11 for SMC messaging. Documented,
+not enforced at runtime.
 
-The library depends on driver semantics introduced in `tt-kmd` 2.10:
-open-time exclusive arbitration (`O_EXCL`) and reset-issuing file descriptors
-surviving the reset generation bump. Older drivers silently ignore `O_EXCL`
-on the device file, leaving `tt_reset()` unfenced.
+The library depends on driver semantics introduced in `tt-kmd` 2.10: open-time
+exclusive arbitration (`O_EXCL`) and reset-issuing file descriptors surviving
+the reset generation bump. Older drivers silently ignore `O_EXCL` on the device
+file, leaving `tt_reset()` unfenced.
 
-Runtime version checks are policy, not mechanism, so the library performs
-none. The requirement is documented here, in the README, and as comments at
-each site in the source that depends on a versioned driver feature.
+SMC messaging sits one release higher. `TENSTORRENT_IOCTL_SMC_MSG` landed in
+2.11.0, so `tt_smc_call()` and its primitives need 2.11 while everything else
+still works on 2.10. An older driver has no such ioctl and rejects the request
+with `EINVAL`, unless it refuses the call earlier for an uninitialized device.
+The floor is stated per function rather than raised for the whole library, so
+diagnosis stays available on a host that cannot yet flash.
+
+Runtime version checks are policy, not mechanism, so the library performs none.
+The requirement is documented here, in the README, and in the public header
+wherever an API depends on a versioned driver feature.
 
 ### API Conventions
 
@@ -146,8 +154,8 @@ names (`ENODEV`, `EAGAIN`) rather than a private error vocabulary. The library
 raises standard `errno` values for the failures it detects itself: `EINVAL`
 (bad argument), `ENOTCONN` (session not open), `ENODEV` (device not found,
 normalized from device lookups), `EIO` (device I/O failed, also raised for
-driver soft-failures), `ETIMEDOUT` (reset did not complete), and `ENOTSUP`
-(unsupported device architecture).
+driver soft-failures), `ETIMEDOUT` (reset or message exchange timed out), and
+`ENOTSUP` (unsupported device architecture).
 
 One value is normalized rather than propagated: a session operation that
 fails with `ENODEV` had its descriptor invalidated by an out-of-band reset
@@ -278,15 +286,15 @@ TLB windows follow a strict **allocate → bind → free** lifecycle:
 > The operation is named `tt_tlb_bind` rather than `tt_tlb_configure` because
 > it *associates* (binds) a window to a specific device address, analogous to
 > binding a socket to a network address. "Configure" implies adjusting internal
-> settings; "bind" captures the association between the window and its target
-> address, which is the essential operation here.
+> settings, while "bind" captures the association between the window and its
+> target address, which is the essential operation here.
 
 ##### Memory Mapping
 
 If `tt_tlb_alloc()` mapped the window immediately, the pointer would reference
 undefined NOC address space until configuration. Users could accidentally
 read or write through the pointer, causing silent data corruption or undefined
-hardware behavior.
+hardware behaviour.
 
 **Solution**: Defer `mmap` until `tt_tlb_bind`.
 
@@ -389,17 +397,17 @@ explicit opt-ins.
 **TL;DR**: `tt_open()` takes a flags bitmask mirroring `open(2)`. There are
 no variant functions.
 
-`tt_open()` mirrors `open(2)`: one function, with behavior selected by a
-flags bitmask (`tt_open_flag_t`). `TT_OPEN_EXCL` requests the writer side of
-the kernel's open-time arbitration, `TT_OPEN_NONBLOCK` converts either wait
-into an immediate `EAGAIN`, and the plain open is just `flags == 0`.
+`tt_open()` mirrors `open(2)`: one function, with behaviour selected by a flags
+bitmask (`tt_open_flag_t`). `TT_OPEN_EXCL` requests the writer side of the
+kernel's open-time arbitration, `TT_OPEN_NONBLOCK` converts either wait into an
+immediate `EAGAIN`, and the plain open is just `flags == 0`.
 
 - Flag values are library-owned bits, mapped onto `O_EXCL`/`O_NONBLOCK`
   internally. The platform's numeric values never enter the ABI.
 - Unknown bits fail with `EINVAL`, so a future flag cannot silently no-op on
   an older library.
 - There is no blocking-versus-nonblocking default to choose. Both kernel
-  behaviors are exposed one-to-one, and callers compose them.
+  behaviours are exposed one-to-one, and callers compose them.
 
 #### Power Management
 
@@ -454,7 +462,7 @@ driver exactly, so a caller can drive an exchange itself.
 
 The driver multiplexes one SMC message queue across every open file
 descriptor, and each descriptor may have one message outstanding at a time.
-Submitting and collecting are separate ioctls: POST never waits for the
+Submitting and collecting are separate ioctl calls: POST never waits for the
 firmware, and POLL reports `EAGAIN` until the reply lands. The API mirrors
 that shape rather than hiding it.
 
@@ -495,7 +503,7 @@ contract. See [QUIRKS.md](QUIRKS.md).
 ### Concurrency
 
 **TL;DR**: A session is the unit of concurrency. Do not share one across
-threads; open a second session on the same device instead.
+threads. Open a second session on the same device instead.
 
 The library holds no global state and takes no locks. Every operation acts on
 a session, which wraps one file descriptor, and the kernel driver arbitrates
@@ -505,8 +513,8 @@ hazard concrete: one message may be outstanding per descriptor, so a second
 concurrent send reports `EBUSY`.
 
 The supported pattern is one session per thread. The driver multiplexes the
-device across descriptors by design, so several sessions on the same device
-is the sanctioned way to work in parallel, not a workaround.
+device across descriptors by design, so several sessions on the same device are
+the sanctioned way to work in parallel.
 
 The bindings inherit this. The Rust `Session` is `Send` but not `Sync`, so
 sharing one between threads is a compile error rather than a runtime race.
@@ -557,9 +565,9 @@ is that users must manage handle storage themselves.
 ```text
 ╭─────────────────────────────────────╮
 │  tt-umd (C++ layer)                 │
-│  - Policy, abstractions             │
-│  - High-level API design            │
-│  - Opinionated object model         │
+│  - Stateful device objects          │
+│  - Cluster and chip model           │
+│  - C++ consumer API                 │
 ╰─────────────────────────────────────╯
                  ↑
 ╭─────────────────────────────────────╮
@@ -581,8 +589,8 @@ is that users must manage handle storage themselves.
 
 - **Above KMD**: Direct consumer of kernel IOCTLs. Functionality maps to kernel
   capabilities with minimal added functionality (e.g. telemetry).
-- **Below UMD**: Foundation for higher-level libraries. UMD provides stateful,
-  object-oriented abstractions.
+- **Below UMD**: Foundation for higher-level libraries. UMD builds a stateful
+  device and cluster model on top, in C++.
 
 ## Future Extensibility
 
@@ -623,7 +631,7 @@ The following changes are permitted in minor or patch releases:
 - Reporting new `errno` values for new failure modes.
 - Adding new enum members.
 - Adding new architecture support.
-- Bug fixes that don't change API behavior.
+- Bug fixes that don't change API behaviour.
 
 These changes maintain backwards compatibility and do not require recompilation.
 

@@ -57,11 +57,10 @@ int tt_dev_from_path(const char *path, tt_device_t *dev) {
     return TT_OK;
 }
 
-/// Create device from a PCIe BDF address.
+/// Create device from a PCIe bus/device/function (BDF) address.
 ///
 /// Scans connected devices and initializes the descriptor for the device
-/// matching the given bus/device/function (BDF). Accepts DDDD:BB:DD.F or
-/// BB:DD.F format.
+/// matching the given BDF. Accepts DDDD:BB:DD.F or BB:DD.F format.
 int tt_dev_from_bdf(const char *addr, tt_device_t *dev) {
     // Validate args
     if (!addr || !dev)
@@ -91,8 +90,8 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev) {
 
     // Scan connected devices for a BDF match.
     //
-    // Device numbers are not stable across resets, so BDF is the only
-    // reliable identifier for a specific physical device.
+    // Device numbers can change when a device is removed and re-probed, so BDF
+    // is the only reliable identifier for a specific physical device.
     //
     // The buffer bound is an implementation convenience, not part of the
     // function's contract. It is chosen to exceed the device count of any
@@ -145,7 +144,7 @@ ssize_t tt_dev_scan(size_t cap, tt_device_t buf[static cap]) {
     size_t count = 0;
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
-        // Skip non-numeric entries (e.g., by-id/ symlinks, subdirs)
+        // Skip anything but character devices (e.g., by-id/ symlinks, subdirs)
         if (entry->d_type != DT_CHR)
             continue;
 

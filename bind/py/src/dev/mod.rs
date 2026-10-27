@@ -26,7 +26,7 @@ use pyo3::prelude::*;
 #[pyfunction]
 pub fn scan() -> PyResult<Vec<Device>> {
     // Grow-and-retry until all devices fit. `tt_dev_scan` returns the total
-    // count even when it exceeds cap; if so, double the cap and retry.
+    // count even when it exceeds cap. If so, double the cap and retry.
     let mut cap = 32usize;
     let mut buf: Vec<ffi::tt_device_t> = Vec::new();
 
@@ -48,9 +48,9 @@ pub fn scan() -> PyResult<Vec<Device>> {
 
 /// Device descriptor.
 ///
-/// A lightweight, copyable struct describing a device. Holds no open resources.
-/// Call `open()` to obtain a `Session` handle for performing operations on
-/// the device.
+/// A lightweight struct describing a device. Holds no open resources. Call
+/// `open()` to obtain a `Session` handle for performing operations on the
+/// device.
 #[pyclass]
 pub struct Device(pub(crate) ffi::tt_device_t);
 
@@ -170,8 +170,8 @@ impl Device {
 /// Open session handle.
 ///
 /// An owned handle for performing operations on a device. Holds an open file
-/// descriptor for the duration of the session. Call `Device.open()` to
-/// obtain a `Session` that is closed automatically when dropped. Usable as a
+/// descriptor for the duration of the session. Call `Device.open()` to obtain a
+/// `Session` that is closed automatically when garbage collected. Usable as a
 /// context manager, closing the session on block exit.
 #[pyclass]
 pub struct Session {
@@ -275,8 +275,8 @@ impl Session {
     ///
     /// Closes the current descriptor and reopens the same device with the
     /// options this session was opened with. Use this to recover a session
-    /// severed by an out-of-band reset: the reopen succeeds after a reset and
-    /// raises `ENODEV` after a removal.
+    /// severed by an out-of-band reset. After a removal, the reopen raises
+    /// `ENODEV` instead.
     ///
     /// The reopen restores only the session handle. TLB allocations do not
     /// survive it, and any requested power state is dropped with the old
@@ -306,7 +306,7 @@ impl Session {
             (rc, errno, raw)
         });
 
-        // Kept on failure too, since the stale descriptor is closed either way
+        // Kept on failure too, since the stale descriptor is closed either way.
         self.raw = raw;
         if rc != 0 {
             return Err(crate::err::fail(errno));

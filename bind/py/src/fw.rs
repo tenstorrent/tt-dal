@@ -9,7 +9,7 @@ use pyo3::prelude::*;
 use crate::ffi;
 use crate::ver::raw_to_semver;
 
-/// Returns firmware bundle version.
+/// Returns the firmware bundle version.
 ///
 /// Raises `TTError` with:
 ///

@@ -16,9 +16,8 @@
 
 // Resolve a device spec to a tt_device_t.
 //
-// Accepts a /dev/tenstorrent/N path or a PCIe bus/device/function (BDF)
-// string (DDDD:BB:DD.F or
-// BB:DD.F). Returns 0 with `dev->id` set, or -1 on error.
+// Accepts a /dev/tenstorrent/N path or a PCIe bus/device/function (BDF) string
+// (DDDD:BB:DD.F or BB:DD.F). Returns 0 with `dev->id` set, or -1 on error.
 static int device_from_spec(const char *spec, tt_device_t *dev) {
     if (strchr(spec, '/'))
         return tt_dev_from_path(spec, dev);

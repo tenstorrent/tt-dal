@@ -6,7 +6,7 @@
   Rust bindings for the Tenstorrent Device Access Library
 </p>
 
-Safe, idiomatic Rust bindings over [tt-dal]. The crate is split between `ttdal`,
+Safe, idiomatic Rust bindings over [tt-dal]. They are split between `ttdal`,
 which exposes the safe public API, and `ttdal-sys`, which provides the raw FFI
 layer.
 
@@ -14,7 +14,7 @@ layer.
 
 The crate is structured as follows:
 
-```
+```text
 ./
 ├── Cargo.toml       # cargo manifest
 ├── README.md        # this document
@@ -30,7 +30,8 @@ cargo add ttdal
 
 ## Building
 
-Requires CMake 3.21+ and a stable Rust toolchain.
+Building requires CMake 3.21+, a C23 compiler, [libclang] for bindgen, and a
+stable Rust toolchain.
 
 ```bash
 cargo build
@@ -54,3 +55,4 @@ cargo test
 
 [tt-dal]: https://github.com/tenstorrent/tt-dal
 [tt-kmd]: https://github.com/tenstorrent/tt-kmd
+[libclang]: https://rust-lang.github.io/rust-bindgen/requirements.html

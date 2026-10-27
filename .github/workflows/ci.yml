@@ -41,7 +41,7 @@ jobs:
     steps:
       - run: exit 0
 
-  # Build Rust workspace and Python wheels.
+  # Build the C library, the Rust workspace, and Python wheels.
   build:
     needs: lint
     uses: ./.github/workflows/build.yml

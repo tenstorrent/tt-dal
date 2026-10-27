@@ -138,10 +138,9 @@ impl Device {
         // Grow-and-retry until all devices fit.
         //
         // `tt_dev_scan` returns the total device count even when it exceeds
-        // `cap`. If that happens, set the new cap to at least double the
-        // previous cap (taking the observed count as a floor) and retry. The
-        // doubling bounds the number of iterations to O(log n) even under
-        // concurrent device arrival.
+        // `cap`. If that happens, set the new cap to double the observed count
+        // and retry. The doubling bounds the number of iterations to O(log n)
+        // even under concurrent device arrival.
         let mut cap = 32usize;
         let mut buf = Vec::with_capacity(cap);
 
@@ -156,11 +155,11 @@ impl Device {
 
             // Check if capacity was large enough for scan
             match usize::try_from(found) {
-                // Scan failed, report error.
+                // Scan failed, report error
                 Err(_) => return Err(Error::last_error()),
-                // All devices fit in buffer.
+                // All devices fit in buffer
                 Ok(len) if len <= cap => break len,
-                // Too small, grow and retry.
+                // Too small, grow and retry
                 Ok(len) => cap = len * 2,
             }
         };
@@ -288,8 +287,8 @@ impl Session {
     ///
     /// Closes the current descriptor and reopens the same device with the
     /// options this session was opened with. Use this to recover a session
-    /// severed by an out-of-band reset: the reopen succeeds after a reset and
-    /// fails with `ENODEV` after a removal.
+    /// severed by an out-of-band reset. After a removal, the reopen fails with
+    /// `ENODEV` instead.
     ///
     /// The reopen restores only the session handle. TLB allocations do not
     /// survive it, and any requested power state is dropped with the old
@@ -376,8 +375,8 @@ impl Session {
 ///
 /// The [`Session::options()`] method is an alias for `OpenOptions::new()`.
 /// Options are chained onto the builder, then the session is opened with
-/// [`open()`]. Like [`std::fs::OpenOptions`], the builder is `Copy` and
-/// reusable: a single configured value may open any number of sessions.
+/// [`open()`]. The builder is `Copy` and, like [`std::fs::OpenOptions`],
+/// reusable, so a single configured value may open any number of sessions.
 ///
 /// [`open()`]: Self::open
 #[derive(Clone, Copy, Debug, Default)]
