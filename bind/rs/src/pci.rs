@@ -4,8 +4,8 @@
 
 //! PCI address types.
 //!
-//! This module provides [`Address`], a PCI BDF (Bus/Device/Function) address
-//! type modeled on [`std::net::Ipv4Addr`].
+//! This module provides [`Address`], a PCI bus/device/function (BDF) address
+//! type modelled on [`std::net::Ipv4Addr`].
 
 use std::fmt;
 use std::str::FromStr;
@@ -19,8 +19,8 @@ use std::str::FromStr;
 ///
 /// `Address` implements [`Display`] and [`FromStr`]. Two formats are accepted:
 ///
-/// * `DDDD:BB:DD.F` - domain, bus, device, function (all hex)
-/// * `BB:DD.F` - bus, device, function (domain assumed `0000`)
+/// * `DDDD:BB:DD.F`: domain, bus, device, function (all hex)
+/// * `BB:DD.F`: bus, device, function (domain assumed `0000`)
 ///
 /// # Examples
 ///
@@ -94,7 +94,7 @@ impl fmt::Display for Address {
     }
 }
 
-/// The error type returned when parsing a [`Address`] fails.
+/// The error type returned when parsing an [`Address`] fails.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct AddrParseError(());
 

@@ -46,10 +46,11 @@ impl Session {
     /// Returns [`WouldBlock`] if another client opened the device before
     /// exclusive access could be acquired, [`ConnectionReset`] if the device
     /// was reset or removed out-of-band, or [`TimedOut`] if the reset did not
-    /// complete in time. Returns `ENODEV` if the device is absent, `EIO` if
-    /// the reset sequence failed, or `ENOTCONN` if the session is already
-    /// closed, all observable via [`Error::raw_os_error()`]. Other `errno`
-    /// values propagate unchanged. The session is consumed even on error.
+    /// complete in time. Returns `ENODEV` if the device is absent, `EBUSY` if a
+    /// TLB window on the device is exported as a dma-buf, `EIO` if the reset
+    /// sequence failed, or `ENOTCONN` if the session is already closed, all
+    /// observable via [`Error::raw_os_error()`]. Other `errno` values propagate
+    /// unchanged. The session is consumed even on error.
     ///
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
@@ -76,9 +77,10 @@ impl Device {
     /// Returns [`WouldBlock`] if any client (including this process) has the
     /// device open, [`ConnectionReset`] if the device was reset or removed
     /// out-of-band, or [`TimedOut`] if the reset did not complete in time.
-    /// Returns `ENODEV` if the device is absent or `EIO` if the reset
-    /// sequence failed, both observable via [`Error::raw_os_error()`]. Other
-    /// `errno` values propagate unchanged.
+    /// Returns `ENODEV` if the device is absent, `EBUSY` if a TLB window on the
+    /// device is exported as a dma-buf, or `EIO` if the reset sequence failed,
+    /// all observable via [`Error::raw_os_error()`]. Other `errno` values
+    /// propagate unchanged.
     ///
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset

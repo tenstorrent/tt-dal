@@ -34,7 +34,7 @@ fn main() {
     println!("cargo:rerun-if-changed=src");
     println!("cargo:rerun-if-changed=CMakeLists.txt");
 
-    // Build and install libttdal via the parent CMakeLists.txt.
+    // Build and install libttdal via the root CMakeLists.txt.
     let dst = cmake::Config::new(env!("CARGO_MANIFEST_DIR"))
         .define("CMAKE_INSTALL_LIBDIR", "lib")
         .build();
@@ -60,9 +60,9 @@ fn main() {
         // Wrap static inline functions so they can be called from Rust.
         .wrap_static_fns(true)
         .wrap_static_fns_path(&extern_c)
+        .allowlist_file(".*ttdal\\.h")
         // Tell cargo to invalidate the built crate whenever any of the included
         // header files changed.
-        .allowlist_file(".*ttdal\\.h")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .parse_callbacks(Box::new(TtdalCallbacks))
         // Finish the builder and generate the bindings.

@@ -6,8 +6,8 @@
   Python bindings for the Tenstorrent Device Access Library
 </p>
 
-Idiomatic Python bindings over [tt-dal], built with [PyO3] and [maturin]. Wraps
-the C library directly and exposes a submodule structure mirroring the Rust
+Idiomatic Python bindings over [tt-dal], built with [PyO3] and [maturin]. They
+wrap the C library directly and expose a submodule structure mirroring the Rust
 crate.
 
 [tt-dal]: https://github.com/tenstorrent/tt-dal
@@ -18,7 +18,7 @@ crate.
 
 The package is structured as follows:
 
-```
+```text
 ./
 ├── Cargo.toml       # cargo manifest
 ├── pyproject.toml   # python package
@@ -35,7 +35,10 @@ pip install tt-dal
 
 ## Building
 
-Requires CMake 3.21+, a stable Rust toolchain, and [maturin].
+Building requires CMake 3.21+, a C23 compiler, [libclang] for bindgen, a stable
+Rust toolchain, and [maturin].
+
+[libclang]: https://rust-lang.github.io/rust-bindgen/requirements.html
 
 ```bash
 maturin develop           # install into the active Python environment
@@ -64,7 +67,7 @@ with devs[0].open() as sess:
 
     # TLB window (context manager)
     cfg = ttdal.tlb.Config(addr=0x1000, x_end=0, y_end=0)
-    with sess.alloc(ttdal.tlb.Size.Mb16, ttdal.tlb.Caching.Uncached) as tlb:
+    with sess.alloc(ttdal.tlb.Size.Mb2, ttdal.tlb.Caching.Uncached) as tlb:
         with tlb.bind(cfg) as win:
             val = win.read_u32(0)
             win.write_u32(0, val | 1)

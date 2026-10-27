@@ -18,8 +18,8 @@
 
 /// Call SMC with a message.
 ///
-/// Posts the request, then waits for the response. Cancels the message on any
-/// early return, leaving the session free to post again.
+/// Posts the request, then waits for the response. Drops the message if the
+/// wait fails, leaving the session free to post again.
 int tt_smc_call(
     const tt_session_t *sess,
     const tt_smc_msg_t *req,
@@ -50,7 +50,7 @@ int tt_smc_call(
 /// Post an SMC message.
 ///
 /// Copies the eight request words into the driver's per-session slot. The
-/// message is outstanding until polled for or cancelled.
+/// message is outstanding until polled for or dropped.
 int tt_smc_post(const tt_session_t *sess, const tt_smc_msg_t *req) {
     // Validate args
     if (!sess || !req)
@@ -74,8 +74,8 @@ int tt_smc_post(const tt_session_t *sess, const tt_smc_msg_t *req) {
 
 /// Poll for an SMC response.
 ///
-/// Never cancels: an unready message is left outstanding for the caller to
-/// poll again.
+/// Never drops the message: an unready one is left outstanding for the caller
+/// to poll again.
 int tt_smc_poll(const tt_session_t *sess, tt_smc_msg_t *rsp) {
     // Validate args
     if (!sess || !rsp)

@@ -9,7 +9,7 @@ use semver::Version;
 use crate::ver::from_raw;
 use crate::{Result, err, ffi};
 
-/// Returns kernel driver version.
+/// Returns the kernel driver version.
 ///
 /// Discovers and briefly opens an available device to issue the query.
 ///

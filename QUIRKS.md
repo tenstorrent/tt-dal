@@ -14,10 +14,24 @@ a bug if your deployment approaches it.
 ## SMC poll cadence
 
 `tt_smc_wait()` spins on the response for a few polls before sleeping a
-millisecond between them. Both the spin count and the sleep are
-implementation details tuned to observed firmware turnaround, not part of
-the contract, and either may change. Code that needs a specific polling
-rate should drive `tt_smc_poll()` itself.
+millisecond between them. Both the spin count and the sleep are implementation
+details tuned to observed firmware turnaround, not part of the contract, and
+either may change. On a Blackhole running firmware bundle 18.x the reply lands
+on the second poll, inside the spin, so a whole exchange costs about 40
+microseconds. Code that needs a specific polling rate should drive
+`tt_smc_poll()` itself.
+
+## Uninitialized devices
+
+A driver that considers a device uninitialized answers almost every `ioctl` with
+`ENODEV`, which this library reports as `ECONNRESET`. Only device and driver
+info queries and a reset are permitted in that state. The `ENODEV` to
+`ECONNRESET` mapping assumes `ENODEV` on an open session means the descriptor
+was invalidated by a reset or a removal, and that assumption does not hold here,
+so a device that never finished initializing looks like one that vanished.
+Observed on `tt-kmd` 2.9.0, where `tt_power()`, `tt_telemetry()`,
+`tt_tlb_alloc()`, and every `tt_smc_*()` call returned `ECONNRESET` while
+`tt_dev_info()` succeeded.
 
 ## Signal handler
 

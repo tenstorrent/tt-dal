@@ -19,7 +19,7 @@ int main(void) {
     tt_smc_msg_t req = { 0 };
     req.message[0]   = SMC_MSG_TEST;
     req.message[1]   = 0xCAFE;
-    // Firmware may lack a message queue (old firmware); skip if unavailable.
+    // Firmware may lack a message queue (old firmware), so skip if unavailable.
     if (tt_smc_post(sess, &req) == 0) {
         // Discarding the response frees the session to post again.
         assert(tt_smc_drop(sess) == 0);

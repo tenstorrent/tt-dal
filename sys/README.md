@@ -19,8 +19,8 @@ cargo add ttdal-sys
 
 ## Building
 
-Requires CMake 3.21+, a C23 compiler, [libclang] for bindgen, and a stable Rust
-toolchain.
+Building requires CMake 3.21+, a C23 compiler, [libclang] for bindgen, and a
+stable Rust toolchain.
 
 [tt-dal]: https://github.com/tenstorrent/tt-dal
 [bindgen]: https://github.com/rust-lang/rust-bindgen

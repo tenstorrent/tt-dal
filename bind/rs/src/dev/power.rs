@@ -9,8 +9,8 @@
 //! disabled when absent.
 //!
 //! The kernel driver aggregates power requests across all open sessions. A
-//! feature stays enabled as long as any session requests it and is withdrawn
-//! automatically when that session closes.
+//! feature stays enabled as long as any session requests it, and a session's
+//! request is withdrawn automatically when it closes.
 //!
 //! # Usage
 //!
@@ -48,19 +48,19 @@ use crate::{Result, err};
 pub enum Flag {
     /// AI clock selection.
     ///
-    /// Requests maximum AI clock frequency when set; minimum when clear.
+    /// Requests maximum AI clock frequency when set, and minimum when clear.
     MaxAiClk = ffi::TT_POWER_MAX_AI_CLK as u16,
     /// GDDR PHY state.
     ///
-    /// Wakes up the GDDR PHY when set; powers it down when clear.
+    /// Wakes up the GDDR PHY when set, and powers it down when clear.
     MriscPhyWakeup = ffi::TT_POWER_MRISC_PHY_WAKEUP as u16,
     /// Tensix core gating.
     ///
-    /// Enables Tensix cores when set; clock gates them when clear.
+    /// Enables Tensix cores when set, and clock gates them when clear.
     TensixEnable = ffi::TT_POWER_TENSIX_ENABLE as u16,
     /// L2CPU clock gating.
     ///
-    /// Enables L2CPU when set; clock gates it when clear.
+    /// Enables L2CPU when set, and clock gates it when clear.
     L2CpuEnable = ffi::TT_POWER_L2CPU_ENABLE as u16,
 }
 

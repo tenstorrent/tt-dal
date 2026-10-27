@@ -63,7 +63,9 @@ typedef struct tt_version {
 
 /// Get the library version at compile time.
 ///
-/// Use this to verify ABI compatibility.
+/// The function is defined in this header, so it reports the version of the
+/// header the caller compiled against. It does not query the library the caller
+/// links against.
 ///
 /// @return  Library version.
 [[nodiscard]] static inline tt_version_t tt_version(void) {
@@ -76,10 +78,9 @@ typedef struct tt_version {
 
 /// Get the KMD version.
 ///
-/// The kernel-mode driver (KMD) version is a property of the kernel module,
-/// not a specific device.
-/// This function discovers an available device, queries the version through
-/// it, and closes it before returning.
+/// The kernel-mode driver (KMD) version is a property of the kernel module, not
+/// a specific device. This function discovers an available device, queries the
+/// version through it, and closes it before returning.
 ///
 /// @param[out] version  KMD version output.
 /// @return              0 on success, -1 on error (check `errno`).
@@ -137,13 +138,12 @@ tt_fw_version(const tt_session_t *sess, tt_version_t *version);
  * * `ENODEV`     No such device (normalized from device lookups).
  * * `EAGAIN`     Device held by another client (non-blocking open).
  * * `ECONNRESET` Device connection reset. The session was severed by an
- *                out-of-band reset or removal (normalized from `ENODEV`
- *                on session operations). Reopen to continue: the open
- *                succeeds after a reset and reports `ENODEV` after a
- *                removal.
+ *                out-of-band reset or removal (normalized from `ENODEV` on
+ *                session operations). Reopening recovers the session after a
+ *                reset and reports `ENODEV` after a removal.
  * * `EIO`        Device I/O failed (also raised for driver
  *                soft-failures).
- * * `ETIMEDOUT`  Reset did not complete in time.
+ * * `ETIMEDOUT`  Reset or SMC message exchange did not complete in time.
  * * `ENOTSUP`    Operation not supported on this device architecture.
  */
 
@@ -196,21 +196,21 @@ typedef enum tt_arch {
 ///
 /// A small, copyable struct describing a device. Holds no open resources.
 ///
-/// Obtain via `tt_dev_scan()`, `tt_dev_from_path()`, or
-/// `tt_dev_from_bdf()`. To perform operations on the device, open a session
-/// handle with `tt_open()`.
+/// Obtain via `tt_dev_scan()`, `tt_dev_from_path()`, or `tt_dev_from_bdf()`. To
+/// perform operations on the device, open a session handle with `tt_open()`.
 typedef struct tt_device {
     /// Device identifier.
     ///
     /// Uniquely identifies a device. Suitable for comparisons, as multiple
     /// descriptors for the same device will share this identifier.
     ///
-    /// TODO: This value should remain stable after a reset, although the
-    /// current implementation does not reflect this. This could be accomplished
-    /// by using a driver-provided UUID rather than using the device number.
+    /// TODO: This value should remain stable when the device is removed and
+    /// re-probed, although the current implementation does not reflect this.
+    /// This could be accomplished by using a driver-provided UUID rather than
+    /// using the device number.
     ///
     /// NOTE: This choice of type is unstable, and may be changed without
-    /// warning before the initial release.
+    /// warning before the first stable release.
     uint32_t id;
 } tt_device_t;
 
@@ -233,8 +233,8 @@ typedef struct tt_session {
     int fd;
     /// Open flags.
     ///
-    /// Bitmask of `tt_open_flag_t` values the session was opened with,
-    /// reused by `tt_reopen()`.
+    /// Bitmask of `tt_open_flag_t` values the session was opened with, reused
+    /// by `tt_reopen()`.
     uint16_t flags;
 } tt_session_t;
 
@@ -250,7 +250,8 @@ typedef struct tt_session {
 ///
 /// @par Errors
 ///
-/// * `EINVAL`     `path` or `dev` is `NULL`, or `path` is not a device node.
+/// * `EINVAL`     `path` or `dev` is `NULL`, or `path` is not a
+///                `/dev/tenstorrent/` device node.
 /// * `ENODEV`     The path does not resolve to a device.
 ///
 /// @par Example
@@ -302,9 +303,9 @@ typedef struct tt_session {
 /// Discover connected devices.
 ///
 /// Scans for connected devices. Fills buffer with up to `cap` descriptors.
-/// Return value may exceed `cap` if more devices were found. A missing
-/// device directory means the driver is not loaded, so it scans as zero
-/// devices rather than failing.
+/// Return value may exceed `cap` if more devices were found. A missing device
+/// directory means the driver is not loaded, so it scans as zero devices rather
+/// than failing.
 ///
 /// Must call `tt_open()` to obtain a session before using a device obtained
 /// this way.
@@ -342,28 +343,28 @@ typedef struct tt_session {
 typedef enum tt_open_flag {
     /// Exclusive access.
     ///
-    /// Waits until no other client has the device open, then blocks all
-    /// other opens for the session's lifetime. A blocking exclusive open
-    /// can be starved by a steady stream of shared opens, so combine with
+    /// Waits until no other client has the device open, then blocks all other
+    /// opens for the session's lifetime. A blocking exclusive open can be
+    /// starved by a steady stream of shared opens, so combine with
     /// `TT_OPEN_NONBLOCK` to fail fast.
     ///
-    /// This requires `tt-kmd` 2.10 or later, which arbitrates exclusive
-    /// access at open time. Older drivers silently ignore the flag.
+    /// This requires `tt-kmd` 2.10 or later, which arbitrates exclusive access
+    /// at open time. Older drivers silently ignore the flag.
     TT_OPEN_EXCL     = (1U << 0),
     /// Non-blocking open.
     ///
-    /// Fails with `EAGAIN` instead of waiting: an exclusive open fails
-    /// while any other client has the device open, and a shared open fails
-    /// while another client holds the device exclusively.
+    /// Fails with `EAGAIN` instead of waiting: an exclusive open fails while
+    /// any other client has the device open, and a shared open fails while
+    /// another client holds the device exclusively.
     TT_OPEN_NONBLOCK = (1U << 1),
 } tt_open_flag_t;
 
 /// Open a session handle for a device.
 ///
-/// Opens the underlying device and initializes the session handle for use.
-/// The open blocks while another client holds the device exclusively (e.g.
-/// during `tt_reset()` or a flash sequence). The session struct is reusable:
-/// it may be reopened after `tt_close()`.
+/// Opens the underlying device and initializes the session handle for use. The
+/// open blocks while another client holds the device exclusively (e.g. during
+/// `tt_reset()` or a flash sequence). The session struct is reusable: it may be
+/// reopened after `tt_close()`.
 ///
 /// @param dev       Device descriptor.
 /// @param[out] sess Session handle to initialize.
@@ -372,11 +373,10 @@ typedef enum tt_open_flag {
 ///
 /// @par Errors
 ///
-/// * `EINVAL`     `dev` or `sess` is `NULL`, or `flags` contains unknown
-///                bits.
+/// * `EINVAL`     `dev` or `sess` is `NULL`, or `flags` contains unknown bits.
 /// * `ENODEV`     The device could not be opened.
-/// * `EAGAIN`     `TT_OPEN_NONBLOCK` is set and another client holds the
-///                device incompatibly.
+/// * `EAGAIN`     `TT_OPEN_NONBLOCK` is set and another client holds the device
+///                incompatibly.
 [[nodiscard]] int
 tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags);
 
@@ -400,8 +400,7 @@ tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags);
 ///
 /// Closes the session's current descriptor, then reopens the same device with
 /// the flags it was opened with. Use this to recover a session severed by an
-/// out-of-band reset: the reopen succeeds after a reset and reports `ENODEV`
-/// after a removal.
+/// out-of-band reset. After a removal, the reopen reports `ENODEV` instead.
 ///
 /// The reopen restores only the session handle. TLB allocations do not survive
 /// it, and any requested power state is dropped with the old descriptor. The
@@ -472,8 +471,8 @@ typedef struct tt_dev_info {
 
 /// TLB size.
 ///
-/// Valid TLB window sizes. Not all sizes are available on all architectures;
-/// kernel validates availability.
+/// Valid TLB window sizes. Not all sizes are available on all architectures.
+/// The kernel rejects unsupported sizes at allocation time.
 typedef enum tt_tlb_size {
     /// 1MB window.
     ///
@@ -589,8 +588,9 @@ typedef struct tt_tlb_config {
 /// Calling with an already-mapped TLB to rebind will invalidate stale interior
 /// pointers (fail-fast on misuse).
 ///
-/// On failure the window is left completely unconfigured (`ptr` is `NULL`),
-/// including the previous mapping on a failed rebind.
+/// If the window cannot be mapped or configured, it is left completely
+/// unconfigured (`ptr` is `NULL`), including the previous mapping on a failed
+/// rebind.
 ///
 /// @param sess  Session handle.
 /// @param tlb   TLB handle.
@@ -610,9 +610,8 @@ typedef struct tt_tlb_config {
 
 /// Free a TLB window.
 ///
-/// Releases the TLB window and unmaps its memory region. An unconfigured
-/// window (never bound) needs no unmap. On success the handle's `id` is
-/// cleared.
+/// Releases the TLB window and unmaps its memory region. An unconfigured window
+/// (never bound) needs no unmap. On success the handle's `id` is cleared.
 ///
 /// The window is unmapped even if the session is no longer open. A live mapping
 /// keeps the closed descriptor alive in the driver, and with it the TLB and any
@@ -636,6 +635,11 @@ typedef struct tt_tlb_config {
  *                                                                            *
  * The System Management Controller (SMC) is the embedded controller          *
  * managing firmware, power, and clocks.                                      *
+ *                                                                            *
+ * These calls need `tt-kmd` 2.11 or later, which is above the 2.10 floor the *
+ * rest of the library requires. An older driver has no message ioctl and     *
+ * rejects the request with `EINVAL`, though a device the driver considers    *
+ * uninitialized fails earlier with `ECONNRESET`. See QUIRKS.md.              *
  *============================================================================*/
 
 /// Default response timeout in milliseconds.
@@ -647,8 +651,8 @@ typedef struct tt_tlb_config {
 typedef struct tt_smc_msg {
     /// Message words. Word 0 is the header: the message code in its low byte
     /// plus any per-message packed fields, and the firmware status on a
-    /// response. Words 1 through 7 carry the request arguments or the
-    /// response data.
+    /// response. Words 1 through 7 carry the request arguments or the response
+    /// data.
     uint32_t message[8];
 } tt_smc_msg_t;
 
@@ -676,7 +680,8 @@ typedef struct tt_smc_msg {
 ///
 /// @par Errors
 ///
-/// * `EINVAL`     `sess`, `req`, or `rsp` is `NULL`.
+/// * `EINVAL`     `sess`, `req`, or `rsp` is `NULL`, or the driver is older
+///                than `tt-kmd` 2.11.
 /// * `ENOTCONN`   The session is not open.
 /// * `EBUSY`      The session already has a message outstanding.
 /// * `ETIMEDOUT`  No response arrived within `timeout`.
@@ -708,7 +713,8 @@ typedef struct tt_smc_msg {
 ///
 /// @par Errors
 ///
-/// * `EINVAL`     `sess` or `req` is `NULL`.
+/// * `EINVAL`     `sess` or `req` is `NULL`, or the driver is older than
+///                `tt-kmd` 2.11.
 /// * `ENOTCONN`   The session is not open.
 /// * `EBUSY`      The session already has a message outstanding.
 /// * `ENOTSUP`    The firmware provides no usable message queue.
@@ -723,7 +729,7 @@ tt_smc_post(const tt_session_t *sess, const tt_smc_msg_t *req);
 /// Checks once whether the response to a posted message is ready, without
 /// blocking. On success writes the reply to `rsp`, freeing the session to post
 /// again. A response that is not ready leaves the message outstanding, to poll
-/// again or cancel, and `rsp` untouched.
+/// again or drop, and `rsp` untouched.
 ///
 /// Success means the exchange completed, not that the firmware accepted the
 /// message: inspect `rsp.message[0]` (the firmware status, `0` on success) for
@@ -750,7 +756,7 @@ tt_smc_post(const tt_session_t *sess, const tt_smc_msg_t *req);
 /// Polls for the response to a posted message until it arrives, `timeout`
 /// milliseconds elapse, or the exchange fails. On success writes the reply to
 /// `rsp`, freeing the session to post again. On timeout the message is left
-/// outstanding, to wait on again or cancel, and `rsp` untouched.
+/// outstanding, to wait on again or drop, and `rsp` untouched.
 ///
 /// Success means the exchange completed, not that the firmware accepted the
 /// message: inspect `rsp.message[0]` (the firmware status, `0` on success) for
@@ -776,16 +782,15 @@ tt_smc_wait(const tt_session_t *sess, tt_smc_msg_t *rsp, uint32_t timeout);
 
 /// Drop an outstanding SMC message.
 ///
-/// Discards the message posted with `tt_smc_post()`. A session with
-/// nothing outstanding is left untouched. The session is free to post again
-/// on return.
+/// Discards the message posted with `tt_smc_post()`. A session with nothing
+/// outstanding is left untouched. The session is free to post again on return.
 ///
-/// Dropping does not reliably stop the message. The driver discards it
-/// outright only while it is still queued behind another client's message.
-/// Once it reaches the controller, which is usually before
-/// `tt_smc_post()` returns, the message runs and only its response is
-/// thrown away. A caller cannot tell the two apart, so treat a dropped
-/// message as one that may have run and may have changed device state.
+/// Dropping does not reliably stop the message. The driver discards it outright
+/// only while it is still queued behind another client's message. Once it
+/// reaches the controller, which is usually before `tt_smc_post()` returns, the
+/// message runs and only its response is thrown away. A caller cannot tell the
+/// two apart, so treat a dropped message as one that may have run and may have
+/// changed device state.
 ///
 /// @param sess  Session handle.
 /// @return      0 on success, -1 on error (check `errno`).
@@ -1003,15 +1008,15 @@ typedef uint32_t tt_telemetry_t[TT_TELEMETRY_LEN];
 
 /// Power feature flags.
 ///
-/// Individual power feature controls passed to `tt_power()`.
-/// Each flag is a single bit. Set it to enable the feature, clear to disable.
+/// Individual power feature controls passed to `tt_power()`. Each flag is a
+/// single bit. Set it to enable the feature, clear to disable.
 ///
-/// @note Sessions opened via `tt_open()` start with all features off.
-/// Use `tt_power()` to request power features explicitly.
+/// @note Sessions opened via `tt_open()` start with all features off. Use
+/// `tt_power()` to request power features explicitly.
 typedef enum tt_power_flag {
     /// AI clock selection.
     ///
-    /// Requests maximum AI clock frequency when set; minimum when clear.
+    /// Requests maximum AI clock frequency when set, and minimum when clear.
     TT_POWER_MAX_AI_CLK       = (1U << 0),
     /// GDDR PHY state.
     ///
@@ -1095,6 +1100,7 @@ typedef enum tt_power_flag {
 /// * `ENODEV`     The device does not exist.
 /// * `EAGAIN`     Another client holds the device open.
 /// * `ECONNRESET` The device was reset or removed out-of-band.
+/// * `EBUSY`      A TLB window on the device is exported as a dma-buf.
 /// * `EIO`        The reset sequence failed.
 /// * `ETIMEDOUT`  The reset did not complete in time.
 ///
@@ -1122,6 +1128,7 @@ typedef enum tt_power_flag {
 /// * `ENODEV`     The device does not exist.
 /// * `EAGAIN`     Another client holds the device open.
 /// * `ECONNRESET` The device was reset or removed out-of-band.
+/// * `EBUSY`      A TLB window on the device is exported as a dma-buf.
 /// * `EIO`        The reset sequence failed.
 /// * `ETIMEDOUT`  The reset did not complete in time.
 ///

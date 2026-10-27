@@ -27,6 +27,7 @@ impl Session {
     /// - `EAGAIN` if another client opened the device before exclusive
     ///   access could be acquired.
     /// - `ECONNRESET` if the device was reset or removed out-of-band.
+    /// - `EBUSY` if a TLB window on the device is exported as a dma-buf.
     /// - `EIO` if the reset sequence failed.
     /// - `ETIMEDOUT` if the reset did not complete in time.
     ///
@@ -70,6 +71,7 @@ impl Device {
     /// - `ENODEV` if the device does not exist.
     /// - `EAGAIN` if any client (including this process) has the device open.
     /// - `ECONNRESET` if the device was reset or removed out-of-band.
+    /// - `EBUSY` if a TLB window on the device is exported as a dma-buf.
     /// - `EIO` if the reset sequence failed.
     /// - `ETIMEDOUT` if the reset did not complete in time.
     ///

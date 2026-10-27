@@ -10,7 +10,7 @@ use crate::dev::Session;
 use crate::ver::from_raw;
 use crate::{Result, err, ffi};
 
-/// Returns firmware bundle version.
+/// Returns the firmware bundle version.
 ///
 /// # Errors
 ///

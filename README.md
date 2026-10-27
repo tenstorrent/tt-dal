@@ -24,9 +24,9 @@
 `tt-dal` provides low-level, stateless access to Tenstorrent device hardware
 through the kernel-mode driver ([KMD][tt-kmd]). It provides raw hardware
 primitives through an unopinionated device model to support operations such as
-discovery, memory-mapped I/O via TLB windows, telemetry, and reset operations.
-Higher-level libraries should build on this library for application-level device
-management.
+discovery, memory-mapped I/O via TLB windows, System Management Controller (SMC)
+messaging, telemetry, and reset operations. Higher-level libraries should build
+on this library for application-level device management.
 
 [tt-kmd]: https://github.com/tenstorrent/tt-kmd
 
@@ -54,7 +54,7 @@ backstops will guard against unintended breakage:
 - **C ABI**: [`abidiff`][libabigail] (libabigail) flags binary-incompatible
   changes to `libttdal`.
 
-Neither detects semantic (behavior-only) changes; those are declared in the
+Neither detects semantic (behaviour-only) changes, which are declared in the
 commit message.
 
 [semver-checks]: https://github.com/obi1kenobi/cargo-semver-checks
@@ -66,6 +66,7 @@ commit message.
 - Comprehensive error handling
 - Device discovery and lifecycle management
 - TLB allocations for memory-mapped I/O
+- System Management Controller (SMC) messaging
 - Telemetry snapshots
 - Power state management
 - Reset operations
@@ -75,7 +76,8 @@ commit message.
 ### Prerequisites
 
 - C23 toolchain (or C++17 for C++ consumers of the header)
-- [tt-kmd] kernel driver (version 2.10+) must be installed and loaded
+- [tt-kmd] kernel driver (version 2.10+) must be installed and loaded (SMC
+  messaging needs 2.11+)
 - CMake 3.21+
 
 ### Building
@@ -83,7 +85,7 @@ commit message.
 ```bash
 # Prepare build files
 cmake -B build
-# Build all artifacts
+# Build library
 make -C build all
 ```
 
@@ -98,8 +100,9 @@ See the public header for complete API documentation.
 cmake --install build --prefix /usr/local
 ```
 
-This installs `libttdal.a`, the public header, and the CMake package
-configuration for downstream `find_package(ttdal)` consumers.
+This installs `libttdal.a`, the public header, the CMake package configuration
+for downstream `find_package(ttdal)` consumers, and a `ttdal.pc` file for
+`pkg-config`.
 
 ### Examples
 
@@ -115,7 +118,7 @@ Example programs are provided under [`examples/`](/examples):
 make test
 ```
 
-Hardware tests are labeled `hardware` and require the [tt-kmd] kernel driver
+Hardware tests are labelled `hardware` and require the [tt-kmd] kernel driver
 and a connected device. By default, `make test` excludes them. To control
 which tests run, pass `PRESET`:
 
@@ -135,7 +138,7 @@ system. Language bindings are available under `bind/`:
 [bind:rs]: /bind/rs/README.md
 [bind:py]: /bind/py/README.md
 
-```
+```text
 ./
 ├── CMakeLists.txt   # build configuration
 ├── Cargo.lock       # cargo lockfile
@@ -171,8 +174,9 @@ through public issues.
 ## License
 
 - [LICENSE](/LICENSE) (Apache License 2.0): overall license for this project,
-  except where specified. See [LICENSE_understanding.txt](/LICENSE_understanding.txt)
-  for a plain-language summary of how this license applies to this project.
+  except where specified. See
+  [LICENSE_understanding.txt](/LICENSE_understanding.txt) for a plain-language
+  summary of how this license applies to this project.
 - `vendor/tt-kmd/ioctl.h` is vendored from [tt-kmd]. It is authored by
   Tenstorrent and was originally released under
   `GPL-2.0-only WITH Linux-syscall-note`. It is re-released here under

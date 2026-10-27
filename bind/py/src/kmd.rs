@@ -9,7 +9,7 @@ use pyo3::prelude::*;
 use crate::ffi;
 use crate::ver::raw_to_semver;
 
-/// Returns kernel driver version.
+/// Returns the kernel driver version.
 ///
 /// Discovers and briefly opens an available device to issue the query.
 ///

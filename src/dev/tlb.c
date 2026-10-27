@@ -12,7 +12,7 @@
 
 /// Allocate a TLB window.
 ///
-/// Allocates TLB via `ioctl`. Does not `mmap` yet; `ptr == NULL` until
+/// Allocates TLB via `ioctl`. Does not `mmap` yet, so `ptr == NULL` until
 /// `tt_tlb_bind()` is called.
 int tt_tlb_alloc(
     const tt_session_t *sess,
@@ -72,7 +72,7 @@ cleanup:
 
 /// Bind TLB to a NOC address.
 ///
-/// `mmap`s TLB on first call. On rebind, `munmap`s old and remaps new to
+/// `mmap`s TLB on first call. On rebind, maps new before unmapping old to
 /// invalidate stale interior pointers.
 int tt_tlb_bind(
     const tt_session_t *sess, tt_tlb_t *tlb, const tt_tlb_config_t *cfg
@@ -88,9 +88,10 @@ int tt_tlb_bind(
     // Map TLB into user space.
     //
     // On reconfigure, we `mmap` the new address before unmapping the old one.
-    // This ensures kernel gives us a different virtual address, invalidating
-    // any stale interior pointers users may have saved. (Traps with `SIGSEGV`
-    // rather than silently accessing different device memory).
+    // This ensures the kernel gives us a different virtual address,
+    // invalidating any stale interior pointers users may have saved. Such a
+    // pointer then traps with `SIGSEGV` rather than silently accessing
+    // different device memory.
     void *ptr = mmap(
         NULL, tlb->len, PROT_READ | PROT_WRITE, MAP_SHARED, sess->fd, tlb->idx
     );

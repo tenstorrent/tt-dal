@@ -4,9 +4,9 @@
 
 //! Memory windows.
 //!
-//! Translation Lookaside Buffer (TLB) windows map a region of device NOC
-//! address space into host-accessible memory. Access follows a three-step
-//! lifetime chain:
+//! Translation Lookaside Buffer (TLB) windows map a region of device
+//! network-on-chip (NOC) address space into host-accessible memory. Access
+//! follows a three-step lifetime chain:
 //!
 //! 1. Allocate a `Tlb` via `Session.alloc()`, specifying window size and
 //!    caching.
@@ -143,9 +143,9 @@ impl Config {
 
 /// An allocated TLB window bound to a `Session`.
 ///
-/// The TLB is freed automatically when dropped. The window is not mapped until
-/// `Tlb.bind()` is called. Usable as a context manager, freeing the TLB on
-/// block exit.
+/// The TLB is freed automatically when garbage collected. The window is not
+/// mapped until `Tlb.bind()` is called. Usable as a context manager, freeing
+/// the TLB on block exit.
 #[pyclass(unsendable)]
 pub struct Tlb {
     pub(crate) raw: ffi::tt_tlb_t,
@@ -225,7 +225,7 @@ impl Tlb {
             linked: cfg.linked,
             static_vc: cfg.static_vc,
         };
-        // SAFETY: `dev_ptr` is an open device, self_.raw was allocated by
+        // SAFETY: `dev_ptr` is an open session, self_.raw was allocated by
         // tt_tlb_alloc, and cfg is a valid configuration.
         crate::err::check(unsafe { ffi::tt_tlb_bind(dev_ptr, &mut self_.raw, &raw) })?;
         // SAFETY: `self_.as_ptr()` is a borrowed Python object pointer.

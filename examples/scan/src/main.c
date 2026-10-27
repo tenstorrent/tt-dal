@@ -14,7 +14,7 @@
 
 #define DEVBUFSZ 256
 
-// Collected entry: device handle plus queried info
+// Collected entry: device descriptor plus queried info
 typedef struct {
     tt_device_t dev;
     tt_dev_info_t info;

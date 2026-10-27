@@ -17,9 +17,9 @@ use pyo3::prelude::*;
 
 /// An SMC controller message.
 ///
-/// Holds the eight-word SMC payload. Word 0 is the header (message code in the
-/// low byte plus any per-message packed fields, and the firmware status on a
-/// response); words 1 through 7 carry the request arguments or the response
+/// Holds the eight-word SMC payload. Word 0 is the header: the message code in
+/// its low byte plus any per-message packed fields, and the firmware status on
+/// a response. Words 1 through 7 carry the request arguments or the response
 /// data. `Session.call()` returns the reply as a new `Message`.
 #[pyclass(from_py_object)]
 #[derive(Clone)]
@@ -27,9 +27,9 @@ pub struct Message(pub(crate) ffi::tt_smc_msg_t);
 
 #[pymethods]
 impl Message {
-    /// Creates an SMC message from up to 8 payload words.
+    /// Creates an SMC message from up to eight payload words.
     ///
-    /// Raises `ValueError` if `message` has more than 8 elements.
+    /// Raises `ValueError` if `message` has more than eight elements.
     #[new]
     #[pyo3(signature = (message=None))]
     fn new(message: Option<Vec<u32>>) -> PyResult<Self> {
@@ -54,7 +54,7 @@ impl Message {
 
     /// Sets the message words.
     ///
-    /// Raises `ValueError` if `message` has more than 8 elements.
+    /// Raises `ValueError` if `message` has more than eight elements.
     #[setter]
     fn set_message(&mut self, message: Vec<u32>) -> PyResult<()> {
         if message.len() > 8 {
@@ -90,7 +90,8 @@ use super::Session;
 pub struct Queued {
     /// Session the message was posted on, kept alive for the handle.
     sess: Py<Session>,
-    /// Whether the reply has been taken, so the drop is a no-op.
+    /// Whether the message has been consumed or dropped, so the drop is a
+    /// no-op.
     done: bool,
 }
 
@@ -191,8 +192,9 @@ impl Session {
     /// during the exchange. A persistent session does not reopen for messaging
     /// the way other calls do, since reopening would discard the message.
     ///
-    /// Raises `TTError` with `ENOTCONN` if the session has been closed, or with
-    /// `ETIMEDOUT`, `EBUSY`, or `ENOTSUP` per the underlying call.
+    /// Raises `TTError` with `ENOTCONN` if the session has been closed, with
+    /// `EINVAL` if the driver is older than `tt-kmd` 2.11, or with `ETIMEDOUT`,
+    /// `EBUSY`, `ENOTSUP`, or `ECONNRESET` per the underlying call.
     #[pyo3(signature = (req, timeout=None))]
     pub fn call(&self, py: Python<'_>, req: Message, timeout: Option<f64>) -> PyResult<Message> {
         let ms = millis(timeout)?;
@@ -220,8 +222,9 @@ impl Session {
     /// Returns a `Queued` handle for the reply. A session holds at most one
     /// message outstanding at a time.
     ///
-    /// Raises `TTError` with `ENOTCONN` if the session has been closed, or with
-    /// `EBUSY` or `ENOTSUP` per the underlying call.
+    /// Raises `TTError` with `ENOTCONN` if the session has been closed, with
+    /// `EINVAL` if the driver is older than `tt-kmd` 2.11, or with `EBUSY`,
+    /// `ENOTSUP`, or `ECONNRESET` per the underlying call.
     pub fn post(slf: Py<Self>, py: Python<'_>, req: Message) -> PyResult<Queued> {
         {
             let sess = slf.try_borrow(py)?;
