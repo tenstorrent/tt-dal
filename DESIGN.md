@@ -338,15 +338,21 @@ can abort the operation and report an error instead.
 
 #### Reset Semantics
 
-**TL;DR**: A reset never interrupts other clients. `tt_reset()` resets a
-device no one else is using, and `tt_reset_with()` resets through the
-caller's exclusive session, which stays open afterward.
+**TL;DR**: A reset never interrupts other clients unless the caller
+forces it. `tt_reset()` resets a device no one else is using, and
+`tt_reset_with()` resets through the caller's exclusive session, which
+stays open afterward. A forced reset goes ahead while other clients have
+the device open, and their sessions fail until they reopen. No reset,
+forced or not, interrupts a client that holds the device exclusively.
 
 Reset comes in two forms:
 
 ```c
-int tt_reset(const tt_device_t *dev);         // No session required
-int tt_reset_with(const tt_session_t *sess);  // Runs on the caller's fd
+// No session required
+int tt_reset(const tt_device_t *dev, uint16_t flags);
+
+// Runs on the caller's fd
+int tt_reset_with(const tt_session_t *sess, uint16_t flags);
 ```
 
 **Exclusivity**: The kernel arbitrates device access at open time as a
@@ -384,6 +390,16 @@ forms are fenced, and they differ in what the caller keeps: `tt_reset()` is
 transient, and `tt_reset_with()` resets in place and leaves the session
 open.
 
+**Forcing**: `TT_RESET_FORCE` is the explicit opt-in for resetting under
+other clients. `tt_reset()` then opens the device with `O_NONBLOCK` alone,
+and `tt_reset_with()` skips its `EPERM` check. Either way the driver
+invalidates every other client's descriptors, and their sessions report
+`ECONNRESET` until reopened. The flag does not override an exclusive
+holder: the kernel refuses a plain open while an `O_EXCL` descriptor is
+held, so a forced `tt_reset()` still fails with `EAGAIN`, and no shared
+session can exist alongside one to force a reset through. Unknown flag bits
+fail with `EINVAL`, as they do for `tt_open()`.
+
 **Rejected**: Having `tt_reset_with()` close the session and reopen with
 `O_EXCL` to fence. That was the original implementation. It has to close
 first, because the caller's own descriptor would block the exclusive open,
@@ -398,17 +414,17 @@ reopening once the reset returns.
 
 > [!NOTE]
 >
-> While a reset (or any future exclusive holder, e.g. a flasher) holds the
-> device, all other opens block until it is released, and the kernel
-> provides no bypass. Recovery from a hung exclusive holder is out-of-band
-> (sysfs remove, BMC) and beyond this library.
+> While an unforced reset (or any future exclusive holder, e.g. a flasher)
+> holds the device, all other opens block until it is released, and the
+> kernel provides no bypass. Recovery from a hung exclusive holder is
+> out-of-band (sysfs remove, BMC) and beyond this library.
 
-**Philosophy**: Reset is inherently disruptive (it invalidates all TLBs and
-device state). Rather than making a forced reset maximally available, the
-API makes the safe reset the only reset: `tt_reset()` acquires exclusivity
-internally, `tt_reset_with()` requires a session that already holds it, and
-refusal is loud. Force and blocking variants may be added later as explicit
-opt-ins.
+**Philosophy**: Reset is inherently disruptive. It invalidates every mapping and
+every other client's session, and resets device state. Rather than making a
+forced reset maximally available, the API makes the safe reset the default:
+`tt_reset()` acquires exclusivity internally, `tt_reset_with()` requires a
+session that already holds it, and refusal is loud. Forcing is an explicit
+opt-in on each call, and a blocking variant may be added later as another.
 
 ### API Design
 

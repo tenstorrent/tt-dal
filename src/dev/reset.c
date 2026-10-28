@@ -130,28 +130,39 @@ static int reset(const tt_session_t *sess) {
 ///
 /// Acquires exclusive access to the device, runs the reset sequence, and
 /// releases the device. Exclusive acquisition guarantees no other client's
-/// session is destroyed by the reset.
-int tt_reset(const tt_device_t *dev) {
+/// session is destroyed by the reset. A forced reset opens the device shared
+/// instead.
+int tt_reset(const tt_device_t *dev, uint16_t flags) {
     // Validate args
     if (!dev)
         return tt_fail(EINVAL);
 
-    // Acquire exclusive access.
+    // Reject unknown flags
+    if (flags & ~TT_RESET_FORCE)
+        return tt_fail(EINVAL);
+
+    // Acquire access.
     //
-    // Acquisition succeeds only when no other client has the device open,
-    // so a reset never destroys another client's session out from under
-    // it. Non-blocking, because a blocking exclusive open can be starved
-    // by a steady stream of shared opens. On older drivers `TT_OPEN_EXCL`
-    // is silently ignored, leaving the reset unfenced.
+    // Exclusive acquisition succeeds only when no other client has the
+    // device open, so a reset never destroys another client's session out
+    // from under it. A forced reset opens shared instead, which succeeds
+    // alongside other shared clients but not while another client holds the
+    // device exclusively. Non-blocking either way, because a blocking
+    // exclusive open can be starved by a steady stream of shared opens, and a
+    // blocking shared open would wait out an exclusive holder. On older
+    // drivers `TT_OPEN_EXCL` is silently ignored, leaving the reset unfenced.
+    uint16_t open_flags = TT_OPEN_NONBLOCK;
+    if (!(flags & TT_RESET_FORCE))
+        open_flags |= TT_OPEN_EXCL;
     tt_session_t sess;
-    if (tt_open(dev, &sess, TT_OPEN_EXCL | TT_OPEN_NONBLOCK) < 0)
+    if (tt_open(dev, &sess, open_flags) < 0)
         return TT_ERR;
 
     // Reset device
     int rc  = reset(&sess);
     int err = errno; // saved before `tt_close` can clobber it
 
-    // Release exclusive access
+    // Release the device
     if (tt_close(&sess) < 0 && rc == TT_OK)
         return TT_ERR;
 
@@ -162,23 +173,29 @@ int tt_reset(const tt_device_t *dev) {
 ///
 /// Runs the reset sequence on the session's own descriptor. The driver
 /// carries that descriptor across the reset, so the session stays open and
-/// usable. The session must hold the device exclusively, so the reset never
-/// destroys another client's session out from under it.
-int tt_reset_with(const tt_session_t *sess) {
+/// usable. Unless the reset is forced, the session must hold the device
+/// exclusively, so the reset never destroys another client's session out from
+/// under it.
+int tt_reset_with(const tt_session_t *sess, uint16_t flags) {
     // Validate args
     if (!sess)
+        return tt_fail(EINVAL);
+
+    // Reject unknown flags
+    if (flags & ~TT_RESET_FORCE)
         return tt_fail(EINVAL);
 
     // Ensure session is open
     if (sess->fd < 0)
         return tt_fail(ENOTCONN);
 
-    // Require exclusive access.
+    // Require exclusive access unless forced.
     //
     // Exclusivity can only be acquired at open time, so it is read from the
     // flags the session was opened with. An exclusive session is the sole
-    // client, so the reset cannot invalidate another client's descriptors.
-    if (!(sess->flags & TT_OPEN_EXCL))
+    // client, so the reset cannot invalidate another client's descriptors. A
+    // forced reset skips the check and resets under any other client.
+    if (!(flags & TT_RESET_FORCE) && !(sess->flags & TT_OPEN_EXCL))
         return tt_fail(EPERM);
 
     // Reset device

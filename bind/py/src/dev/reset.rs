@@ -22,16 +22,18 @@ impl Session {
     /// session do not survive the reset, and accessing one afterwards faults
     /// with `SIGBUS`.
     ///
-    /// The session must have been opened with `exclusive=True`. Exclusivity
-    /// can only be acquired at open time, and an exclusive session is already
-    /// the sole client, so the reset never destroys another client's session
-    /// out from under it. Use `Device.reset()` to reset a device this process
-    /// does not hold.
+    /// The session must have been opened with `exclusive=True` unless `force`
+    /// is set. Exclusivity can only be acquired at open time, and an exclusive
+    /// session is already the sole client, so the reset never destroys another
+    /// client's session out from under it. Set `force` to reset under any
+    /// other client instead, whose sessions the driver then invalidates. Use
+    /// `Device.reset()` to reset a device this process does not hold.
     ///
     /// Raises `TTError` with:
     ///
     /// - `ENOTCONN` if the session has already been closed.
-    /// - `EPERM` if the session was not opened with `exclusive=True`.
+    /// - `EPERM` if the session was not opened with `exclusive=True` and
+    ///   `force` is not set.
     /// - `ECONNRESET` if the device was reset or removed out-of-band.
     /// - `EBUSY` if a TLB window on the device is exported as a dma-buf.
     /// - `EIO` if the reset sequence failed.
@@ -41,14 +43,21 @@ impl Session {
     ///
     /// The reset sequence takes seconds, so this releases the interpreter lock
     /// while it runs.
-    pub fn reset(&mut self, py: Python<'_>) -> PyResult<()> {
+    #[pyo3(signature = (*, force = false))]
+    pub fn reset(&mut self, py: Python<'_>, force: bool) -> PyResult<()> {
+        let mut flags = 0;
+        if force {
+            flags |= ffi::TT_RESET_FORCE;
+        }
+        let flags = flags as u16;
+
         self.perform(|sess| {
             // The raw pointer cannot cross threads, so pass its address.
             let sess = sess as usize;
             let (rc, errno) = py.detach(move || {
                 // SAFETY: `sess` is a valid session handle, and `tt_reset_with`
                 // leaves it open, so the fd stays owned by `self`.
-                let rc = unsafe { ffi::tt_reset_with(sess as *const ffi::tt_session_t) };
+                let rc = unsafe { ffi::tt_reset_with(sess as *const ffi::tt_session_t, flags) };
                 // Read here, before reattaching can clobber it.
                 let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
                 (rc, errno)
@@ -68,12 +77,15 @@ impl Device {
     ///
     /// Acquires exclusive access, issues the full reset sequence, and
     /// releases it. No session is required. The reset is refused while any
-    /// client (including this process) has the device open.
+    /// client (including this process) has the device open. Set `force` to
+    /// open the device shared instead, so the reset goes ahead while other
+    /// clients hold it and invalidates their sessions.
     ///
     /// Raises `TTError` with:
     ///
     /// - `ENODEV` if the device does not exist.
-    /// - `EAGAIN` if any client (including this process) has the device open.
+    /// - `EAGAIN` if any client (including this process) has the device open,
+    ///   or, with `force` set, if any client holds it exclusively.
     /// - `ECONNRESET` if the device was reset or removed out-of-band.
     /// - `EBUSY` if a TLB window on the device is exported as a dma-buf.
     /// - `EIO` if the reset sequence failed.
@@ -83,12 +95,18 @@ impl Device {
     ///
     /// The reset sequence takes seconds, so this releases the interpreter lock
     /// while it runs.
-    #[pyo3(name = "reset")]
-    pub fn reset_(&self, py: Python<'_>) -> PyResult<()> {
+    #[pyo3(name = "reset", signature = (*, force = false))]
+    pub fn reset_(&self, py: Python<'_>, force: bool) -> PyResult<()> {
+        let mut flags = 0;
+        if force {
+            flags |= ffi::TT_RESET_FORCE;
+        }
+        let flags = flags as u16;
+
         let dev = self.0;
         let (rc, errno) = py.detach(move || {
             // SAFETY: `dev` is a valid device descriptor.
-            let rc = unsafe { ffi::tt_reset(&raw const dev) };
+            let rc = unsafe { ffi::tt_reset(&raw const dev, flags) };
             // Read here, before reattaching can clobber it.
             let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
             (rc, errno)

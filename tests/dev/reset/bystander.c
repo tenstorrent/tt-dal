@@ -19,21 +19,30 @@ int main(void) {
     assert(tt_open(&dev, &other, 0) == 0);
 
     // A shared session must not reset under the bystander
-    assert(tt_reset_with(&self) < 0);
+    assert(tt_reset_with(&self, 0) < 0);
     assert(errno == EPERM);
 
     // The bystander is untouched
     tt_dev_info_t info;
     assert(tt_dev_info(&other, &info) == 0);
-    assert(tt_close(&other) == 0);
-    assert(tt_close(&self) == 0);
 
-    // An exclusive session resets once the bystander is gone
-    assert(tt_open(&dev, &self, TT_OPEN_EXCL) == 0);
-    assert(tt_reset_with(&self) == 0);
+    // A forced reset goes ahead under the bystander
+    assert(tt_reset_with(&self, TT_RESET_FORCE) == 0);
 
     // The resetting session survives
     tt_telemetry_t table;
+    assert(tt_telemetry(&self, table) == 0);
+
+    // The bystander does not
+    assert(tt_dev_info(&other, &info) < 0);
+    assert(errno == ECONNRESET);
+
+    (void)tt_close(&other);
+    assert(tt_close(&self) == 0);
+
+    // An exclusive session resets without forcing
+    assert(tt_open(&dev, &self, TT_OPEN_EXCL) == 0);
+    assert(tt_reset_with(&self, 0) == 0);
     assert(tt_telemetry(&self, table) == 0);
     assert(tt_close(&self) == 0);
 }

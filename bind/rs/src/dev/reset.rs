@@ -18,8 +18,13 @@
 //! exclusive session is already the sole client, so neither form destroys
 //! another client's session out from under it.
 //!
+//! Either form can be forced with [`ResetOptions::force()`], which resets
+//! under any other client and invalidates its sessions. A client holding the
+//! device [`exclusive`][excl] still keeps it, so a forced [`Device::reset()`]
+//! is refused while one does.
+//!
 //! ```no_run
-//! # use ttdal::dev::{Device, Session};
+//! # use ttdal::dev::{Device, Session, reset::ResetOptions};
 //! #
 //! # let dev = Device::scan().unwrap().next().unwrap();
 //! #
@@ -27,7 +32,7 @@
 //! let mut sess = Session::options().exclusive(true).open(dev)?;
 //!
 //! // Reset the device, leaving the session open
-//! sess.reset()?;
+//! sess.reset(&ResetOptions::new())?;
 //! #
 //! # Ok::<(), ttdal::Error>(())
 //! ```
@@ -47,8 +52,8 @@ impl Session {
     /// open and usable, whether the reset succeeds or fails. The reset runs in
     /// place, so the device number does not change.
     ///
-    /// The session must have been opened with [`exclusive`][excl] set. See
-    /// the [module docs][self] for why.
+    /// The session must have been opened with [`exclusive`][excl] set unless
+    /// `opts` sets [`force`][force]. See the [module docs][self] for why.
     ///
     /// Takes `&mut self` so that no TLB window, [`call()`][call],
     /// [`post()`][post], or [`try_wait()`][try_wait] can be live on this
@@ -58,26 +63,28 @@ impl Session {
     /// # Errors
     ///
     /// Returns [`PermissionDenied`] if the session was not opened with
-    /// [`exclusive`][excl] set, [`ConnectionReset`] if the device was reset or
-    /// removed out-of-band, or [`TimedOut`] if the reset did not complete in
-    /// time. Returns `EBUSY` if a TLB window on the device is exported as a
-    /// dma-buf, `EIO` if the reset sequence failed, or `ENOTCONN` if the
-    /// session is closed, all observable via [`Error::raw_os_error()`]. Other
-    /// `errno` values propagate unchanged.
+    /// [`exclusive`][excl] set and `opts` does not set [`force`][force],
+    /// [`ConnectionReset`] if the device was reset or removed out-of-band, or
+    /// [`TimedOut`] if the reset did not complete in time. Returns `EBUSY` if a
+    /// TLB window on the device is exported as a dma-buf, `EIO` if the reset
+    /// sequence failed, or `ENOTCONN` if the session is closed, all observable
+    /// via [`Error::raw_os_error()`]. Other `errno` values propagate unchanged.
     ///
     /// [call]: Session::call
     /// [post]: Session::post
     /// [try_wait]: super::smc::Queued::try_wait
     /// [excl]: super::OpenOptions::exclusive
+    /// [force]: ResetOptions::force
     /// [`PermissionDenied`]: std::io::ErrorKind::PermissionDenied
     /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
     /// [`TimedOut`]: std::io::ErrorKind::TimedOut
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
-    pub fn reset(&mut self) -> Result<()> {
+    pub fn reset(&mut self, opts: &ResetOptions) -> Result<()> {
+        let flags = opts.flags();
         self.perform(|sess| {
             // SAFETY: `sess` is a valid session handle, and `tt_reset_with`
             // leaves it open.
-            err::check(unsafe { ffi::tt_reset_with(sess.as_ptr()) })
+            err::check(unsafe { ffi::tt_reset_with(sess.as_ptr(), flags) })
         })
     }
 }
@@ -86,25 +93,73 @@ impl Device {
     /// Resets the device.
     ///
     /// Acquires exclusive access, issues the full reset sequence, and
-    /// releases it. No session is required.
+    /// releases it. No session is required. With [`force`][force] set in
+    /// `opts`, the device is opened shared instead, so the reset goes ahead
+    /// while other clients hold it and invalidates their sessions.
     ///
     /// # Errors
     ///
     /// Returns [`WouldBlock`] if any client (including this process) has the
-    /// device open, [`ConnectionReset`] if the device was reset or removed
-    /// out-of-band, or [`TimedOut`] if the reset did not complete in time.
-    /// Returns `ENODEV` if the device is absent, `EBUSY` if a TLB window on the
-    /// device is exported as a dma-buf, or `EIO` if the reset sequence failed,
-    /// all observable via [`Error::raw_os_error()`]. Other `errno` values
-    /// propagate unchanged.
+    /// device open, or, with [`force`][force] set, if any client holds it
+    /// exclusively. Returns [`ConnectionReset`] if the device was reset or
+    /// removed out-of-band, or [`TimedOut`] if the reset did not complete in
+    /// time. Returns `ENODEV` if the device is absent, `EBUSY` if a TLB window
+    /// on the device is exported as a dma-buf, or `EIO` if the reset sequence
+    /// failed, all observable via [`Error::raw_os_error()`]. Other `errno`
+    /// values propagate unchanged.
     ///
+    /// [force]: ResetOptions::force
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
     /// [`TimedOut`]: std::io::ErrorKind::TimedOut
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
-    pub fn reset(&self) -> Result<()> {
+    pub fn reset(&self, opts: &ResetOptions) -> Result<()> {
         // SAFETY: `self.0` is a valid device descriptor.
-        err::check(unsafe { ffi::tt_reset(self.as_ptr()) })
+        err::check(unsafe { ffi::tt_reset(self.as_ptr(), opts.flags()) })
+    }
+}
+
+/// Options which can be used to configure how a device is reset.
+///
+/// Options are chained onto the builder, then passed to [`Session::reset()`]
+/// or [`Device::reset()`]. Like [`OpenOptions`], the builder is `Copy` and
+/// reusable, so a single configured value may reset any number of devices.
+///
+/// [`OpenOptions`]: super::OpenOptions
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ResetOptions {
+    force: bool,
+}
+
+impl ResetOptions {
+    /// Creates a blank new set of options ready for configuration.
+    ///
+    /// All options are initially set to `false`.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the option for forced resets.
+    ///
+    /// This option, when true, resets the device even while other clients
+    /// hold it, invalidating their sessions. A client holding the device
+    /// [`exclusive`][excl] still keeps it.
+    ///
+    /// [excl]: super::OpenOptions::exclusive
+    pub fn force(&mut self, force: bool) -> &mut Self {
+        self.force = force;
+        self
+    }
+
+    /// Returns the flag bits selected by these options.
+    #[expect(clippy::cast_possible_truncation)]
+    fn flags(self) -> u16 {
+        let mut flags = 0;
+        if self.force {
+            flags |= ffi::TT_RESET_FORCE;
+        }
+        flags as u16
     }
 }
 
@@ -115,6 +170,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn options_flags() {
+        let mut opts = ResetOptions::new();
+        assert_eq!(opts.flags(), 0);
+        opts.force(true);
+        assert_eq!(u32::from(opts.flags()), ffi::TT_RESET_FORCE);
+    }
+
+    #[test]
     #[ignore = "requires hardware"]
     #[serial]
     fn reset_smoke() {
@@ -123,7 +186,21 @@ mod tests {
             .exclusive(true)
             .open(dev)
             .expect("device open failed");
-        sess.reset().expect("reset failed");
+        sess.reset(&ResetOptions::new()).expect("reset failed");
+        sess.info().expect("session lost across reset");
+    }
+
+    #[test]
+    #[ignore = "requires hardware"]
+    #[serial]
+    fn reset_force() {
+        let mut sess = crate::tests::open();
+        let err = sess
+            .reset(&ResetOptions::new())
+            .expect_err("shared reset succeeded");
+        assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
+        sess.reset(ResetOptions::new().force(true))
+            .expect("forced reset failed");
         sess.info().expect("session lost across reset");
     }
 }

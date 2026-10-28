@@ -135,7 +135,8 @@ tt_fw_version(const tt_session_t *sess, tt_version_t *version);
  *
  * * `EINVAL`     Invalid argument.
  * * `ENOTCONN`   Session is not open.
- * * `EPERM`      Session lacks the exclusive access a reset requires.
+ * * `EPERM`      Session lacks the exclusive access an unforced reset
+ *                requires.
  * * `ENODEV`    No such device (normalized from device lookups).
  * * `EAGAIN`     Device held by another client (non-blocking open).
  * * `ECONNRESET` Device connection reset. The session was severed by an
@@ -1073,6 +1074,19 @@ typedef enum tt_power_flag {
  * Device reset operations.                                                   *
  *============================================================================*/
 
+/// Device reset flags.
+///
+/// Flags for `tt_reset()` and `tt_reset_with()`. Each flag is a single bit.
+typedef enum tt_reset_flag {
+    /// Forced reset.
+    ///
+    /// Resets even if other clients hold the device. Their sessions are
+    /// invalidated and report `ECONNRESET` until reopened. A client holding
+    /// the device with `TT_OPEN_EXCL` still keeps it, since no other client
+    /// can open the device while it is held exclusively.
+    TT_RESET_FORCE = (1U << 0),
+} tt_reset_flag_t;
+
 /// Trigger device reset.
 ///
 /// Acquires exclusive access to the device, issues the full reset sequence
@@ -1082,30 +1096,37 @@ typedef enum tt_power_flag {
 /// Acquisition succeeds only when no other client has the device open,
 /// including descriptors held by the calling process. If the device is
 /// busy, the reset fails with `EAGAIN` rather than resetting under other
-/// clients or blocking indefinitely. A reset never destroys another
-/// client's session out from under it. To reset a device the caller has
-/// open, use `tt_reset_with()`.
+/// clients or blocking indefinitely. Unless forced, a reset never destroys
+/// another client's session out from under it. To reset a device the caller
+/// has open, use `tt_reset_with()`.
+///
+/// With `TT_RESET_FORCE`, the device is opened shared instead, so the reset
+/// goes ahead while other clients hold it and invalidates their sessions.
+/// The open still does not wait, and it fails with `EAGAIN` while another
+/// client holds the device with `TT_OPEN_EXCL`.
 ///
 /// The reset runs in place, so the device number does not change.
 ///
 /// This requires `tt-kmd` 2.10 or later, which arbitrates exclusive access
 /// at open time. The requirement is not checked at runtime.
 ///
-/// @param dev   Device descriptor.
-/// @return      0 on success, -1 on error (check `errno`).
+/// @param dev    Device descriptor.
+/// @param flags  Bitmask of `tt_reset_flag_t` values.
+/// @return       0 on success, -1 on error (check `errno`).
 ///
 /// @par Errors
 ///
-/// * `EINVAL`     `dev` is `NULL`.
+/// * `EINVAL`     `dev` is `NULL`, or `flags` contains unknown bits.
 /// * `ENODEV`     The device does not exist.
-/// * `EAGAIN`     Another client holds the device open.
+/// * `EAGAIN`     Another client holds the device open, or holds it with
+///                `TT_OPEN_EXCL` when `TT_RESET_FORCE` is set.
 /// * `ECONNRESET` The device was reset or removed out-of-band.
 /// * `EBUSY`      A TLB window on the device is exported as a dma-buf.
 /// * `EIO`        The reset sequence failed.
 /// * `ETIMEDOUT`  The reset did not complete in time.
 ///
 /// Other codes propagate from the failing system call.
-[[nodiscard]] int tt_reset(const tt_device_t *dev);
+[[nodiscard]] int tt_reset(const tt_device_t *dev, uint16_t flags);
 
 /// Trigger device reset via an open session.
 ///
@@ -1118,23 +1139,27 @@ typedef enum tt_power_flag {
 /// it. Windows mapped through the session do not survive the reset, so an
 /// access through one faults with `SIGBUS`. Their TLBs must still be freed.
 ///
-/// The session must have been opened with `TT_OPEN_EXCL`. Exclusivity can
-/// only be acquired at open time, and an exclusive session is already the
-/// sole client, so the reset never destroys another client's session out
-/// from under it. A shared session is refused with `EPERM`. Use
+/// The session must have been opened with `TT_OPEN_EXCL` unless
+/// `TT_RESET_FORCE` is set. Exclusivity can only be acquired at open time,
+/// and an exclusive session is already the sole client, so the reset never
+/// destroys another client's session out from under it. A shared session is
+/// refused with `EPERM`. With `TT_RESET_FORCE` it resets under any other
+/// client instead, whose sessions the driver then invalidates. Use
 /// `tt_reset()` to reset a device the caller does not already hold.
 ///
 /// This requires `tt-kmd` 2.10 or later, which carries the resetting
 /// descriptor across the reset. The requirement is not checked at runtime.
 ///
-/// @param sess  Session handle.
-/// @return      0 on success, -1 on error (check `errno`).
+/// @param sess   Session handle.
+/// @param flags  Bitmask of `tt_reset_flag_t` values.
+/// @return       0 on success, -1 on error (check `errno`).
 ///
 /// @par Errors
 ///
-/// * `EINVAL`     `sess` is `NULL`.
+/// * `EINVAL`     `sess` is `NULL`, or `flags` contains unknown bits.
 /// * `ENOTCONN`   The session is not open.
-/// * `EPERM`      The session was not opened with `TT_OPEN_EXCL`.
+/// * `EPERM`      The session was not opened with `TT_OPEN_EXCL`, and
+///                `TT_RESET_FORCE` is not set.
 /// * `ECONNRESET` The device was reset or removed out-of-band.
 /// * `EBUSY`      A TLB window on the device is exported as a dma-buf.
 /// * `EIO`        The reset sequence failed.
@@ -1148,14 +1173,14 @@ typedef enum tt_power_flag {
 /// tt_session_t sess;
 /// if (tt_open(&dev, &sess, TT_OPEN_EXCL) < 0)
 ///     return -1;
-/// if (tt_reset_with(&sess) < 0) {
+/// if (tt_reset_with(&sess, 0) < 0) {
 ///     (void)tt_close(&sess);
 ///     return -1;
 /// }
 /// // ... session is still open ...
 /// tt_close(&sess);
 /// ```
-[[nodiscard]] int tt_reset_with(const tt_session_t *sess);
+[[nodiscard]] int tt_reset_with(const tt_session_t *sess, uint16_t flags);
 
 #ifdef __cplusplus
 }
