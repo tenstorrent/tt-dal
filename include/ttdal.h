@@ -146,6 +146,7 @@ tt_fw_version(const tt_session_t *sess, tt_version_t *version);
  * * `EIO`        Device I/O failed (also raised for driver
  *                soft-failures).
  * * `ETIMEDOUT`  Reset or SMC message exchange did not complete in time.
+ * * `ENOTRECOVERABLE` Device did not reinitialize after a reset.
  * * `ENOTSUP`    Operation not supported on this device architecture.
  */
 
@@ -1116,14 +1117,25 @@ typedef enum tt_reset_flag {
 ///
 /// @par Errors
 ///
-/// * `EINVAL`     `dev` is `NULL`, or `flags` contains unknown bits.
-/// * `ENODEV`     The device does not exist.
-/// * `EAGAIN`     Another client holds the device open, or holds it with
-///                `TT_OPEN_EXCL` when `TT_RESET_FORCE` is set.
-/// * `ECONNRESET` The device was reset or removed out-of-band.
-/// * `EBUSY`      A TLB window on the device is exported as a dma-buf.
-/// * `EIO`        The reset sequence failed.
-/// * `ETIMEDOUT`  The reset did not complete in time.
+/// * `EINVAL`          `dev` is `NULL`, or `flags` contains unknown bits.
+/// * `ENODEV`          The device does not exist.
+/// * `EAGAIN`          Another client holds the device open, or holds it
+///                     with `TT_OPEN_EXCL` when `TT_RESET_FORCE` is set.
+/// * `ECONNRESET`      The device was reset or removed out-of-band.
+/// * `EBUSY`           A TLB window on the device is exported as a dma-buf.
+/// * `EIO`             The ASIC reset trigger failed.
+/// * `ETIMEDOUT`       The reset did not complete in time.
+/// * `ENOTRECOVERABLE` The device did not reinitialize after the reset.
+///
+/// A failure with `EIO`, `ETIMEDOUT`, or `ENOTRECOVERABLE` does not leave the
+/// device as it was. After `EIO` or `ETIMEDOUT` the device accepts only info
+/// queries and further resets until one completes. Retry the reset to recover.
+/// After `ENOTRECOVERABLE` the device's state is unknown, and only a later
+/// successful reset makes it usable again.
+///
+/// While the device awaits a completed reset, every other driver request on any
+/// session reports `ECONNRESET`, even on a session opened afterwards, so
+/// reopening does not recover it.
 ///
 /// Other codes propagate from the failing system call.
 [[nodiscard]] int tt_reset(const tt_device_t *dev, uint16_t flags);
@@ -1156,14 +1168,26 @@ typedef enum tt_reset_flag {
 ///
 /// @par Errors
 ///
-/// * `EINVAL`     `sess` is `NULL`, or `flags` contains unknown bits.
-/// * `ENOTCONN`   The session is not open.
-/// * `EPERM`      The session was not opened with `TT_OPEN_EXCL`, and
-///                `TT_RESET_FORCE` is not set.
-/// * `ECONNRESET` The device was reset or removed out-of-band.
-/// * `EBUSY`      A TLB window on the device is exported as a dma-buf.
-/// * `EIO`        The reset sequence failed.
-/// * `ETIMEDOUT`  The reset did not complete in time.
+/// * `EINVAL`          `sess` is `NULL`, or `flags` contains unknown bits.
+/// * `ENOTCONN`        The session is not open.
+/// * `EPERM`           The session was not opened with `TT_OPEN_EXCL`, and
+///                     `TT_RESET_FORCE` is not set.
+/// * `ECONNRESET`      The device was reset or removed out-of-band.
+/// * `EBUSY`           A TLB window on the device is exported as a dma-buf.
+/// * `EIO`             The ASIC reset trigger failed.
+/// * `ETIMEDOUT`       The reset did not complete in time.
+/// * `ENOTRECOVERABLE` The device did not reinitialize after the reset.
+///
+/// A failure with `EIO`, `ETIMEDOUT`, or `ENOTRECOVERABLE` does not leave the
+/// device as it was, and the driver has already invalidated every other
+/// client's descriptors. After `EIO` or `ETIMEDOUT` the device accepts only
+/// info queries and further resets until one completes. Retry the reset to
+/// recover. After `ENOTRECOVERABLE` the device's state is unknown, and only a
+/// later successful reset makes it usable again.
+///
+/// While the device awaits a completed reset, every other driver request on any
+/// session reports `ECONNRESET`, even on a session opened afterwards, so
+/// reopening does not recover it.
 ///
 /// Other codes propagate from the failing system call.
 ///

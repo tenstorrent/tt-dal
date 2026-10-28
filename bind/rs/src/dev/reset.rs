@@ -66,9 +66,22 @@ impl Session {
     /// [`exclusive`][excl] set and `opts` does not set [`force`][force],
     /// [`ConnectionReset`] if the device was reset or removed out-of-band, or
     /// [`TimedOut`] if the reset did not complete in time. Returns `EBUSY` if a
-    /// TLB window on the device is exported as a dma-buf, `EIO` if the reset
-    /// sequence failed, or `ENOTCONN` if the session is closed, all observable
-    /// via [`Error::raw_os_error()`]. Other `errno` values propagate unchanged.
+    /// TLB window on the device is exported as a dma-buf, `EIO` if the ASIC
+    /// reset trigger failed, `ENOTRECOVERABLE` if the device did not
+    /// reinitialize after the reset, or `ENOTCONN` if the session is closed,
+    /// all observable via [`Error::raw_os_error()`]. Other `errno` values
+    /// propagate unchanged.
+    ///
+    /// A failure with `EIO`, `ETIMEDOUT`, or `ENOTRECOVERABLE` does not leave
+    /// the device as it was, and the driver has already invalidated every other
+    /// client's descriptors. After `EIO` or `ETIMEDOUT` the device accepts only
+    /// info queries and further resets until one completes. Retry the reset to
+    /// recover. After `ENOTRECOVERABLE` the device's state is unknown, and only
+    /// a later successful reset makes it usable again.
+    ///
+    /// While the device awaits a completed reset, every other driver request on
+    /// any session reports [`ConnectionReset`], even on a session opened
+    /// afterwards, so reopening does not recover it.
     ///
     /// [call]: Session::call
     /// [post]: Session::post
@@ -104,9 +117,20 @@ impl Device {
     /// exclusively. Returns [`ConnectionReset`] if the device was reset or
     /// removed out-of-band, or [`TimedOut`] if the reset did not complete in
     /// time. Returns `ENODEV` if the device is absent, `EBUSY` if a TLB window
-    /// on the device is exported as a dma-buf, or `EIO` if the reset sequence
-    /// failed, all observable via [`Error::raw_os_error()`]. Other `errno`
+    /// on the device is exported as a dma-buf, `EIO` if the ASIC reset trigger
+    /// failed, or `ENOTRECOVERABLE` if the device did not reinitialize after
+    /// the reset, all observable via [`Error::raw_os_error()`]. Other `errno`
     /// values propagate unchanged.
+    ///
+    /// A failure with `EIO`, `ETIMEDOUT`, or `ENOTRECOVERABLE` does not leave
+    /// the device as it was. After `EIO` or `ETIMEDOUT` the device accepts only
+    /// info queries and further resets until one completes. Retry the reset to
+    /// recover. After `ENOTRECOVERABLE` the device's state is unknown, and only
+    /// a later successful reset makes it usable again.
+    ///
+    /// While the device awaits a completed reset, every other driver request on
+    /// any session reports [`ConnectionReset`], even on a session opened
+    /// afterwards, so reopening does not recover it.
     ///
     /// [force]: ResetOptions::force
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock

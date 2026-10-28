@@ -61,7 +61,7 @@ static int reset(const tt_session_t *sess) {
     if (ioctl(sess->fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req) != 0)
         return tt_fail_io(errno);
     if (req.out.result != 0)
-        return tt_fail(EIO); // soft-failure
+        return tt_fail(EIO); // the ASIC reset trigger failed
 
     // Wait for reset completion.
     //
@@ -121,7 +121,7 @@ static int reset(const tt_session_t *sess) {
     if (ioctl(sess->fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req) != 0)
         return tt_fail_io(errno);
     if (req.out.result != 0)
-        return tt_fail(EIO); // soft-failure
+        return tt_fail(ENOTRECOVERABLE); // the device did not reinitialize
 
     return TT_OK;
 }
