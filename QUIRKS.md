@@ -33,6 +33,10 @@ Observed on `tt-kmd` 2.9.0, where `tt_power()`, `tt_telemetry()`,
 `tt_tlb_alloc()`, and every `tt_smc_*()` call returned `ECONNRESET` while
 `tt_dev_info()` succeeded.
 
+A reset that fails with `EIO` or `ETIMEDOUT` leaves the device in this state
+until a later reset completes. Reopening the session does not help, since
+requests on a new descriptor are refused the same way.
+
 ## Signal handler
 
 The first `tt_telemetry()` call installs a process-wide `SIGBUS` handler

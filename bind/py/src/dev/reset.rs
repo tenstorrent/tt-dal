@@ -36,8 +36,21 @@ impl Session {
     ///   `force` is not set.
     /// - `ECONNRESET` if the device was reset or removed out-of-band.
     /// - `EBUSY` if a TLB window on the device is exported as a dma-buf.
-    /// - `EIO` if the reset sequence failed.
+    /// - `EIO` if the ASIC reset trigger failed.
     /// - `ETIMEDOUT` if the reset did not complete in time.
+    /// - `ENOTRECOVERABLE` if the device did not reinitialize after the
+    ///   reset.
+    ///
+    /// A failure with `EIO`, `ETIMEDOUT`, or `ENOTRECOVERABLE` does not leave
+    /// the device as it was, and the driver has already invalidated every other
+    /// client's descriptors. After `EIO` or `ETIMEDOUT` the device accepts only
+    /// info queries and further resets until one completes. Retry the reset to
+    /// recover. After `ENOTRECOVERABLE` the device's state is unknown, and only
+    /// a later successful reset makes it usable again.
+    ///
+    /// While the device awaits a completed reset, every other driver request on
+    /// any session reports `ECONNRESET`, even on a session opened afterwards,
+    /// so reopening does not recover it.
     ///
     /// Other `errno` values propagate from the failing system call.
     ///
@@ -88,8 +101,20 @@ impl Device {
     ///   or, with `force` set, if any client holds it exclusively.
     /// - `ECONNRESET` if the device was reset or removed out-of-band.
     /// - `EBUSY` if a TLB window on the device is exported as a dma-buf.
-    /// - `EIO` if the reset sequence failed.
+    /// - `EIO` if the ASIC reset trigger failed.
     /// - `ETIMEDOUT` if the reset did not complete in time.
+    /// - `ENOTRECOVERABLE` if the device did not reinitialize after the
+    ///   reset.
+    ///
+    /// A failure with `EIO`, `ETIMEDOUT`, or `ENOTRECOVERABLE` does not leave
+    /// the device as it was. After `EIO` or `ETIMEDOUT` the device accepts only
+    /// info queries and further resets until one completes. Retry the reset to
+    /// recover. After `ENOTRECOVERABLE` the device's state is unknown, and only
+    /// a later successful reset makes it usable again.
+    ///
+    /// While the device awaits a completed reset, every other driver request on
+    /// any session reports `ECONNRESET`, even on a session opened afterwards,
+    /// so reopening does not recover it.
     ///
     /// Other `errno` values propagate from the failing system call.
     ///

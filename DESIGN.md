@@ -408,6 +408,18 @@ failures that never touched the device. It also opened a window in which
 another client could take the device, turning a reset on a session the
 caller held into `EAGAIN`.
 
+**Failure codes**: The driver reports a soft failure (`out.result != 0`) at two
+stages, so they are separated: `EIO` means the ASIC reset trigger failed, and
+`ENOTRECOVERABLE` means post-reset reinitialization failed. A reset that never
+signals completion fails with `ETIMEDOUT`. None of the three leaves the device
+as it was, because the driver invalidates every other client's descriptors and
+tears down mappings before it attempts the reset. After `EIO` or `ETIMEDOUT` the
+device accepts only info queries and further resets until one completes, so the
+remedy is to retry the reset. tt-dal does not issue post-reset after a failed
+trigger or a timeout: post-reset clears the driver's reinitialization gate even
+when it fails, which would make a device that was never reset look usable. After
+`ENOTRECOVERABLE` the device's state is unknown.
+
 **In place**: The driver keeps the device instance alive across the reset,
 so the device number does not change and descriptors remain valid for
 reopening once the reset returns.
