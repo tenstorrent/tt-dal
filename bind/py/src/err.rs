@@ -18,6 +18,23 @@ pub(crate) fn lost() -> bool {
     std::io::Error::last_os_error().raw_os_error() == Some(libc::ECONNRESET)
 }
 
+/// Restores `errno` after a call that may have clobbered it.
+///
+/// Lets [`lost()`] see the failure of a call made with the interpreter lock
+/// released, since reattaching may overwrite `errno`.
+pub(crate) fn restore(errno: core::ffi::c_int) {
+    // SAFETY: the location is the calling thread's own `errno`.
+    #[cfg(target_os = "linux")]
+    unsafe {
+        *libc::__errno_location() = errno;
+    }
+    // SAFETY: the location is the calling thread's own `errno`.
+    #[cfg(target_vendor = "apple")]
+    unsafe {
+        *libc::__error() = errno;
+    }
+}
+
 /// Builds a `TTError` for the given `errno` value.
 pub(crate) fn fail(errno: core::ffi::c_int) -> PyErr {
     // SAFETY: `strerror` returns a pointer to a static, null-terminated

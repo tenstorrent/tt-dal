@@ -195,14 +195,6 @@ impl Session {
         self.raw
     }
 
-    /// Replaces the underlying session handle.
-    ///
-    /// Used to adopt a handle that a call mutated on a copy while the
-    /// interpreter lock was released.
-    pub(crate) fn set_raw(&mut self, raw: ffi::tt_session_t) {
-        self.raw = raw;
-    }
-
     /// Returns a const raw pointer to the underlying session handle.
     pub(crate) fn as_ptr(&self) -> *const ffi::tt_session_t {
         &self.raw

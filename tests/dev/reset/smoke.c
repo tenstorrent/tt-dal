@@ -15,13 +15,15 @@ int main(void) {
     // Reset must succeed without a session
     assert(tt_reset(&dev) == 0);
 
-    // Reset via a session must succeed and consume the session
+    // Reset via a session must succeed and leave the session open
     tt_session_t sess;
-    assert(tt_open(&dev, &sess, 0) == 0);
+    assert(tt_open(&dev, &sess, TT_OPEN_EXCL) == 0);
     assert(tt_reset_with(&sess) == 0);
-    assert(sess.fd == -1);
 
-    // Device must be usable after reset
-    assert(tt_open(&sess.dev, &sess, 0) == 0);
+    // Session must still be usable after reset.
+    //
+    // Telemetry needs the device reinitialized, which info queries do not.
+    tt_telemetry_t table;
+    assert(tt_telemetry(&sess, table) == 0);
     assert(tt_close(&sess) == 0);
 }
