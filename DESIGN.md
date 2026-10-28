@@ -127,7 +127,7 @@ not enforced at runtime.
 The library depends on driver semantics introduced in `tt-kmd` 2.10: open-time
 exclusive arbitration (`O_EXCL`) and reset-issuing file descriptors surviving
 the reset generation bump. Older drivers silently ignore `O_EXCL` on the device
-file, leaving `tt_reset()` unfenced.
+file, leaving both `tt_reset()` and `tt_reset_with()` unfenced.
 
 SMC messaging sits one release higher. `TENSTORRENT_IOCTL_SMC_MSG` landed in
 2.11.0, so `tt_smc_call()` and its primitives need 2.11 while everything else
@@ -338,40 +338,59 @@ can abort the operation and report an error instead.
 
 #### Reset Semantics
 
-**TL;DR**: Reset always runs exclusively. `tt_reset()` acquires exclusive
-access internally and fails with `EAGAIN` if the device is in use.
-`tt_reset_with()` consumes an open session, then does the same.
+**TL;DR**: A reset never interrupts other clients. `tt_reset()` resets a
+device no one else is using, and `tt_reset_with()` resets through the
+caller's exclusive session, which stays open afterward.
 
 Reset comes in two forms:
 
 ```c
-int tt_reset(const tt_device_t *dev);   // No session required
-int tt_reset_with(tt_session_t *sess);  // Consumes the session
+int tt_reset(const tt_device_t *dev);         // No session required
+int tt_reset_with(const tt_session_t *sess);  // Runs on the caller's fd
 ```
 
 **Exclusivity**: The kernel arbitrates device access at open time as a
 reader/writer lock, where `O_EXCL` is the writer and plain opens are
-readers (KMD 2.10 or later). `tt_reset()` opens the device with
-`O_EXCL | O_NONBLOCK`, runs the full sequence (ASIC reset through
-post-reset) on that descriptor, and closes it. Acquisition succeeds only
-when no other client has the device open, so a reset never destroys another
-client's session out from under it.
+readers (KMD 2.10 or later). The driver itself does not require exclusive
+access to reset: `RESET_DEVICE` takes the device's reset semaphore for
+write, which serializes it against other `ioctl`s but permits any
+descriptor to issue it. Exclusivity is the library's own fence, and because
+`O_EXCL` is an open-time flag it can only be acquired by opening.
 
-Acquisition does not wait: if the device is busy, reset fails with
-`EAGAIN` rather than resetting under other clients or blocking
-indefinitely (the kernel's blocking exclusive open can be starved by a
-steady stream of plain opens). The issuing descriptor survives the driver's
-reset generation bump, so the sequence runs on one fd with no close/reopen
-window that would drop exclusivity.
+`tt_reset()` therefore opens the device with `O_EXCL | O_NONBLOCK`, runs
+the full sequence (ASIC reset through post-reset) on that descriptor, and
+closes it. Acquisition succeeds only when no other client has the device
+open, so a reset never destroys another client's session out from under it.
+Acquisition does not wait: if the device is busy, reset fails with `EAGAIN`
+rather than resetting under other clients or blocking indefinitely (the
+kernel's blocking exclusive open can be starved by a steady stream of plain
+opens).
 
-**Consumption**: `tt_reset_with()` closes the session first (exclusive
-acquisition requires the device to be idle, so the caller's own descriptor
-must be released), then delegates to `tt_reset()`. The session is consumed
-on all paths, success or failure, exactly as if `tt_close()` had been
-called: a half-reset device behind a maybe-valid file descriptor is a
-silent corruption hazard. Another client may open the device in the window
-between the close and the exclusive acquisition, in which case the reset
-fails with `EAGAIN`.
+**Sessions survive**: `tt_reset_with()` runs the same sequence on the session's
+own descriptor and opens nothing. The driver carries the issuing descriptor
+across the reset generation bump while invalidating every other descriptor on
+the device, so the session stays open and usable once the reset returns, and it
+stays open when the reset fails too. Its windows do not survive: the driver zaps
+every mapping on the device, the issuer's included, though it keeps the issuer's
+TLB allocations, which must still be freed.
+
+The consequence is that `tt_reset_with()` cannot acquire exclusivity
+itself, so it requires the session to hold it already. A session opened
+with `TT_OPEN_EXCL` is the sole client and the reset is exclusive for free.
+A shared session is refused with `EPERM` rather than resetting under other
+clients, whose descriptors the driver would invalidate. The check reads the
+flags stored in the caller's session, so it holds no state of its own. Both
+forms are fenced, and they differ in what the caller keeps: `tt_reset()` is
+transient, and `tt_reset_with()` resets in place and leaves the session
+open.
+
+**Rejected**: Having `tt_reset_with()` close the session and reopen with
+`O_EXCL` to fence. That was the original implementation. It has to close
+first, because the caller's own descriptor would block the exclusive open,
+and so it destroyed the session it was given on every path including
+failures that never touched the device. It also opened a window in which
+another client could take the device, turning a reset on a session the
+caller held into `EAGAIN`.
 
 **In place**: The driver keeps the device instance alive across the reset,
 so the device number does not change and descriptors remain valid for
@@ -386,9 +405,10 @@ reopening once the reset returns.
 
 **Philosophy**: Reset is inherently disruptive (it invalidates all TLBs and
 device state). Rather than making a forced reset maximally available, the
-API makes the safe reset the only reset: exclusivity is acquired internally
-and refusal is loud. Force and blocking variants may be added later as
-explicit opt-ins.
+API makes the safe reset the only reset: `tt_reset()` acquires exclusivity
+internally, `tt_reset_with()` requires a session that already holds it, and
+refusal is loud. Force and blocking variants may be added later as explicit
+opt-ins.
 
 ### API Design
 

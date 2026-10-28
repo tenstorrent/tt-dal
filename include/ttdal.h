@@ -135,7 +135,8 @@ tt_fw_version(const tt_session_t *sess, tt_version_t *version);
  *
  * * `EINVAL`     Invalid argument.
  * * `ENOTCONN`   Session is not open.
- * * `ENODEV`     No such device (normalized from device lookups).
+ * * `EPERM`      Session lacks the exclusive access a reset requires.
+ * * `ENODEV`    No such device (normalized from device lookups).
  * * `EAGAIN`     Device held by another client (non-blocking open).
  * * `ECONNRESET` Device connection reset. The session was severed by an
  *                out-of-band reset or removal (normalized from `ENODEV` on
@@ -219,10 +220,9 @@ typedef struct tt_device {
 /// An owned handle that holds an open file descriptor to a device. Required to
 /// perform any operation that interacts with hardware.
 ///
-/// Obtain via `tt_open()`; release via `tt_close()`, or by passing to
-/// `tt_reset_with()`, which consumes the session. A handle is also
-/// invalidated by an out-of-band device reset or removal, after which
-/// `tt_reopen()` restores it in place.
+/// Obtain via `tt_open()`, release via `tt_close()`. A handle is invalidated by
+/// an out-of-band device reset or removal. After a reset, `tt_reopen()`
+/// restores it in place.
 typedef struct tt_session {
     /// Device descriptor for this session.
     tt_device_t dev;
@@ -1109,24 +1109,32 @@ typedef enum tt_power_flag {
 
 /// Trigger device reset via an open session.
 ///
-/// Closes the session, then resets the underlying device as `tt_reset()`
-/// does. The session is consumed on all paths, success or failure, just as
-/// if `tt_close()` had been called. `sess->fd` is `-1` on return, and the
-/// device number does not change, so `sess->dev` stays valid for reopening.
+/// Issues the full reset sequence on the session's own descriptor. The
+/// driver carries that descriptor across the reset, so the session stays
+/// open and usable once the reset completes. The reset runs in place, so
+/// the device number does not change.
 ///
-/// Exclusive acquisition requires the device to be idle, so the session is
-/// closed before the reset begins. Another client may open the device in
-/// that window, in which case the reset fails with `EAGAIN`.
+/// The session stays open when the reset fails too, and the caller still closes
+/// it. Windows mapped through the session do not survive the reset, so an
+/// access through one faults with `SIGBUS`. Their TLBs must still be freed.
 ///
-/// @param sess  Session handle (consumed).
+/// The session must have been opened with `TT_OPEN_EXCL`. Exclusivity can
+/// only be acquired at open time, and an exclusive session is already the
+/// sole client, so the reset never destroys another client's session out
+/// from under it. A shared session is refused with `EPERM`. Use
+/// `tt_reset()` to reset a device the caller does not already hold.
+///
+/// This requires `tt-kmd` 2.10 or later, which carries the resetting
+/// descriptor across the reset. The requirement is not checked at runtime.
+///
+/// @param sess  Session handle.
 /// @return      0 on success, -1 on error (check `errno`).
 ///
 /// @par Errors
 ///
 /// * `EINVAL`     `sess` is `NULL`.
 /// * `ENOTCONN`   The session is not open.
-/// * `ENODEV`     The device does not exist.
-/// * `EAGAIN`     Another client holds the device open.
+/// * `EPERM`      The session was not opened with `TT_OPEN_EXCL`.
 /// * `ECONNRESET` The device was reset or removed out-of-band.
 /// * `EBUSY`      A TLB window on the device is exported as a dma-buf.
 /// * `EIO`        The reset sequence failed.
@@ -1138,15 +1146,16 @@ typedef enum tt_power_flag {
 ///
 /// ```c
 /// tt_session_t sess;
-/// if (tt_open(&dev, &sess, 0) < 0)
+/// if (tt_open(&dev, &sess, TT_OPEN_EXCL) < 0)
 ///     return -1;
-/// if (tt_reset_with(&sess) < 0)
-///     return -1;  // Session already consumed
-/// tt_open(&sess.dev, &sess, 0);
-/// // ... use fresh session ...
+/// if (tt_reset_with(&sess) < 0) {
+///     (void)tt_close(&sess);
+///     return -1;
+/// }
+/// // ... session is still open ...
 /// tt_close(&sess);
 /// ```
-[[nodiscard]] int tt_reset_with(tt_session_t *sess);
+[[nodiscard]] int tt_reset_with(const tt_session_t *sess);
 
 #ifdef __cplusplus
 }

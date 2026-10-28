@@ -18,39 +18,18 @@
 #define POLL_INTERVAL_US 100000 // sleep between completion checks
 #define POST_RESET_DELAY_MS 500 // firmware time to publish telemetry
 
-/// Reset device.
+/// Run the reset sequence on an open session.
 ///
-/// Acquires exclusive access to the device, issues an ASIC reset, monitors
-/// sysfs for completion, issues the post-reset `ioctl`, and releases the
-/// device. Exclusive acquisition guarantees no other client's session is
-/// destroyed by the reset.
-int tt_reset(const tt_device_t *dev) {
-    // Validate args
-    if (!dev)
-        return tt_fail(EINVAL);
-
-    // Acquire exclusive access.
-    //
-    // Acquisition succeeds only when no other client has the device open,
-    // so a reset never destroys another client's session out from under
-    // it. Non-blocking, because a blocking exclusive open can be starved
-    // by a steady stream of shared opens. On older drivers `TT_OPEN_EXCL`
-    // is silently ignored, leaving the reset unfenced.
-    tt_session_t sess;
-    if (tt_open(dev, &sess, TT_OPEN_EXCL | TT_OPEN_NONBLOCK) < 0)
-        return TT_ERR;
-    int fd = sess.fd;
-
+/// Issues the ASIC reset, waits for completion, then issues the post-reset
+/// `ioctl` on the same descriptor. Leaves the session open.
+static int reset(const tt_session_t *sess) {
     // Record BDF.
     //
     // Used to locate the device's PCI config space in sysfs for completion
     // polling below.
     tt_dev_info_t info;
-    if (tt_dev_info(&sess, &info) < 0) {
-        int err = errno; // saved before `close` can clobber it
-        close(fd);
-        return tt_fail(err);
-    }
+    if (tt_dev_info(sess, &info) < 0)
+        return TT_ERR;
 
     // Format BDF string
     char bdf[20];
@@ -70,21 +49,19 @@ int tt_reset(const tt_device_t *dev) {
 
     // Issue reset.
     //
-    // Requires KMD >= 2.10: the issuing fd survives the driver's reset
-    // generation bump, so the same fd issues the post-reset `ioctl` below
-    // with no close/reopen window that would drop exclusivity. The reset
-    // runs in place, so the device instance stays alive and the device
-    // number does not change.
+    // Requires KMD >= 2.10: the issuing descriptor is carried across the
+    // driver's reset generation bump, so it survives to issue the post-reset
+    // `ioctl` below and stays valid afterwards. Every other descriptor open
+    // on the device is invalidated. The reset runs in place, so the device
+    // instance stays alive and the device number does not change.
     struct tenstorrent_reset_device req = {
         .in.output_size_bytes = sizeof(req.out),
         .in.flags             = TENSTORRENT_RESET_DEVICE_ASIC_RESET,
     };
-    if (ioctl(fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req) != 0) {
-        int err = errno; // saved before `close` can clobber it
-        return close(fd), tt_fail_io(err);
-    }
+    if (ioctl(sess->fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req) != 0)
+        return tt_fail_io(errno);
     if (req.out.result != 0)
-        return close(fd), tt_fail(EIO); // soft-failure
+        return tt_fail(EIO); // soft-failure
 
     // Wait for reset completion.
     //
@@ -124,7 +101,7 @@ int tt_reset(const tt_device_t *dev) {
         usleep(POLL_INTERVAL_US);
     }
     if (!reset_complete)
-        return close(fd), tt_fail(ETIMEDOUT);
+        return tt_fail(ETIMEDOUT);
 
     // Wait for firmware.
     //
@@ -139,29 +116,55 @@ int tt_reset(const tt_device_t *dev) {
     while (nanosleep(&delay, &delay) < 0 && errno == EINTR)
         continue; // resume the rest after a handled signal
 
-    // Issue post-reset on the surviving fd
+    // Issue post-reset on the surviving descriptor
     req.in.flags = TENSTORRENT_RESET_DEVICE_POST_RESET;
-    if (ioctl(fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req) != 0) {
-        int err = errno; // saved before `close` can clobber it
-        return close(fd), tt_fail_io(err);
-    }
+    if (ioctl(sess->fd, TENSTORRENT_IOCTL_RESET_DEVICE, &req) != 0)
+        return tt_fail_io(errno);
     if (req.out.result != 0)
-        return close(fd), tt_fail(EIO); // soft-failure
-
-    // Release exclusive access
-    if (close(fd) != 0)
-        return TT_ERR;
+        return tt_fail(EIO); // soft-failure
 
     return TT_OK;
 }
 
+/// Reset device.
+///
+/// Acquires exclusive access to the device, runs the reset sequence, and
+/// releases the device. Exclusive acquisition guarantees no other client's
+/// session is destroyed by the reset.
+int tt_reset(const tt_device_t *dev) {
+    // Validate args
+    if (!dev)
+        return tt_fail(EINVAL);
+
+    // Acquire exclusive access.
+    //
+    // Acquisition succeeds only when no other client has the device open,
+    // so a reset never destroys another client's session out from under
+    // it. Non-blocking, because a blocking exclusive open can be starved
+    // by a steady stream of shared opens. On older drivers `TT_OPEN_EXCL`
+    // is silently ignored, leaving the reset unfenced.
+    tt_session_t sess;
+    if (tt_open(dev, &sess, TT_OPEN_EXCL | TT_OPEN_NONBLOCK) < 0)
+        return TT_ERR;
+
+    // Reset device
+    int rc  = reset(&sess);
+    int err = errno; // saved before `tt_close` can clobber it
+
+    // Release exclusive access
+    if (tt_close(&sess) < 0 && rc == TT_OK)
+        return TT_ERR;
+
+    return rc < 0 ? tt_fail(err) : TT_OK;
+}
+
 /// Reset device via an open session.
 ///
-/// Closes the session, then delegates to `tt_reset()`. The session is
-/// consumed on all paths: a half-reset device behind a maybe-valid file
-/// descriptor is a silent corruption hazard, so failing loudly and forcing
-/// a fresh `tt_open()` is the safe contract.
-int tt_reset_with(tt_session_t *sess) {
+/// Runs the reset sequence on the session's own descriptor. The driver
+/// carries that descriptor across the reset, so the session stays open and
+/// usable. The session must hold the device exclusively, so the reset never
+/// destroys another client's session out from under it.
+int tt_reset_with(const tt_session_t *sess) {
     // Validate args
     if (!sess)
         return tt_fail(EINVAL);
@@ -170,16 +173,14 @@ int tt_reset_with(tt_session_t *sess) {
     if (sess->fd < 0)
         return tt_fail(ENOTCONN);
 
-    // Consume session.
+    // Require exclusive access.
     //
-    // Exclusive acquisition in `tt_reset()` succeeds only when no other
-    // descriptor is open, so the caller's own must be released first. On
-    // Linux the fd is freed even when `close(2)` reports an error, so the
-    // session is invalidated unconditionally to uphold the consumed-on-
-    // all-paths contract.
-    if (tt_close(sess) < 0)
-        return sess->fd = -1, TT_ERR;
+    // Exclusivity can only be acquired at open time, so it is read from the
+    // flags the session was opened with. An exclusive session is the sole
+    // client, so the reset cannot invalidate another client's descriptors.
+    if (!(sess->flags & TT_OPEN_EXCL))
+        return tt_fail(EPERM);
 
     // Reset device
-    return tt_reset(&sess->dev);
+    return reset(sess);
 }
