@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < ndevs; i++) {
         printf("%s: resetting device %u...\n", prog, devs[i].id);
 
-        if (tt_reset(&devs[i]) < 0) {
+        if (tt_reset(&devs[i], 0) < 0) {
             fprintf(
                 stderr,
                 "%s: error: device %u: %s\n",

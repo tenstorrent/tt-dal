@@ -43,11 +43,11 @@ previously installed handler and crash as usual.
 ## Unfenced reset on old drivers
 
 `tt-kmd` releases before 2.10 silently ignore `O_EXCL` on the device file, so
-`TT_OPEN_EXCL` keeps no other client out. `tt_reset()` opens the device with
-`TT_OPEN_EXCL` even while other clients hold it, and `tt_reset_with()` accepts
-any session opened with `TT_OPEN_EXCL`, although other clients may hold the
-device too. Either reset then invalidates those clients' sessions. The driver
-version is not checked at runtime.
+`TT_OPEN_EXCL` keeps no other client out. An unforced `tt_reset()` opens the
+device with `TT_OPEN_EXCL` even while other clients hold it, and
+`tt_reset_with()` accepts any session opened with `TT_OPEN_EXCL`, although other
+clients may hold the device too. Either reset then invalidates those clients'
+sessions. The driver version is not checked at runtime.
 
 ## Reset versus removal
 
