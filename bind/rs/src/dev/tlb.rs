@@ -13,8 +13,9 @@
 //! 3. [Read](Window::read) or [write](Window::write) device memory through the
 //!    [`Window`].
 //!
-//! Dropping the [`Window`] releases the mapping and allows [`Tlb::bind()`] to
-//! be called again. Dropping the [`Tlb`] frees the allocation.
+//! Dropping the [`Window`] allows [`Tlb::bind()`] to be called again, which
+//! replaces the mapping. Dropping the [`Tlb`] unmaps it and frees the
+//! allocation.
 //!
 //! # Usage
 //!
