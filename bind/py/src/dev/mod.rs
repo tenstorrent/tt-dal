@@ -111,7 +111,9 @@ impl Device {
     /// out-of-band reset or removal. A device that is truly gone surfaces
     /// as the reopen's `ENODEV`, never as `ECONNRESET`, and a connection
     /// that keeps resetting is retried a bounded number of times before
-    /// reporting `ENODEV` as well.
+    /// reporting `ENODEV` as well. Ensure each `Tlb` is freed before a reopen,
+    /// as the new descriptor may be handed the same TLB IDs, which a stale
+    /// `Tlb` would then free or rebind.
     ///
     /// Raises `TTError` with:
     ///
@@ -272,8 +274,11 @@ impl Session {
     ///
     /// The reopen restores only the session handle. TLB allocations do not
     /// survive it, and any requested power state is dropped with the old
-    /// descriptor. A persistent session reopens on its own, so calling this is
-    /// only necessary for a session opened without `persistent`.
+    /// descriptor. Ensure each TLB allocated through the session is freed
+    /// first, as the new descriptor may be handed the same TLB IDs, which a
+    /// stale `Tlb` would then free or rebind. A persistent session reopens on
+    /// its own, so calling this is only necessary for a session opened without
+    /// `persistent`.
     ///
     /// Raises `TTError` with:
     ///

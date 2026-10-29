@@ -271,7 +271,11 @@ impl Session {
                 if !res.as_ref().is_err_and(Error::is_lost) {
                     return res;
                 }
-                self.reopen()?;
+                // SAFETY: The handle behind `as_mut_ptr` is a valid,
+                // initialized `tt_session_t`. `tt_reopen` closes the stale
+                // descriptor and reopens the same device with the flags stored
+                // in the session.
+                err::check(unsafe { ffi::tt_reopen(self.as_mut_ptr()) })?;
                 res = op(self);
             }
             if res.as_ref().is_err_and(Error::is_lost) {
@@ -292,8 +296,22 @@ impl Session {
     ///
     /// The reopen restores only the session handle. TLB allocations do not
     /// survive it, and any requested power state is dropped with the old
-    /// descriptor. A persistent session (see [`persistent`]) reopens on its
-    /// own, so calling this is only necessary for a session opened without it.
+    /// descriptor. The session is borrowed mutably, so each TLB allocated
+    /// through it must be dropped first, as the new descriptor may be handed
+    /// the same TLB IDs, which a stale [`Tlb`] would then free or rebind. A
+    /// persistent session (see [`persistent`]) reopens on its own, so calling
+    /// this is only necessary for a session opened without it.
+    ///
+    /// ```compile_fail,E0502
+    /// # fn reopen(sess: &mut ttdal::dev::Session) -> ttdal::Result<()> {
+    /// use ttdal::dev::tlb::{Caching, Size};
+    ///
+    /// let tlb = sess.alloc(Size::Mb2, Caching::Uncached)?;
+    /// sess.reopen()?; // `tlb` still borrows the session
+    /// # drop(tlb);
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///
@@ -302,11 +320,12 @@ impl Session {
     /// observable via [`Error::raw_os_error()`], if the device could not be
     /// reopened.
     ///
+    /// [`Tlb`]: tlb::Tlb
     /// [`persistent`]: OpenOptions::persistent
     /// [`nonblocking`]: OpenOptions::nonblocking
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
-    pub fn reopen(&self) -> Result<()> {
+    pub fn reopen(&mut self) -> Result<()> {
         // SAFETY: The handle behind `as_mut_ptr` is a valid, initialized
         // `tt_session_t`. `tt_reopen` closes the stale descriptor and reopens
         // the same device with the flags stored in the session.
@@ -421,17 +440,20 @@ impl OpenOptions {
     /// original options and retries the failing operation when the device
     /// connection is lost to an out-of-band reset or removal. A connection
     /// that keeps resetting is retried a bounded number of times, then
-    /// reported unusable with `ENODEV`. A
-    /// failed reopen surfaces from the operation that triggered it.
+    /// reported unusable with `ENODEV`. A failed reopen surfaces from the
+    /// operation that triggered it.
     ///
     /// The reopen restores only the session handle: TLB allocations do not
     /// survive it, and requested power state is dropped with the stale
-    /// descriptor. A device that is truly gone surfaces as the reopen's
-    /// `ENODEV`, never as [`ConnectionReset`].
+    /// descriptor. Ensure each [`Tlb`] is dropped before a reopen, as the new
+    /// descriptor may be handed the same TLB IDs, which a stale [`Tlb`] would
+    /// then free or rebind. A device that is truly gone surfaces as the
+    /// reopen's `ENODEV`, never as [`ConnectionReset`].
     ///
     /// SMC calls are never retried, since a message that ran before the
     /// reset would run twice.
     ///
+    /// [`Tlb`]: tlb::Tlb
     /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
     pub fn persistent(&mut self, persist: bool) -> &mut Self {
         self.persist = persist;
@@ -511,7 +533,7 @@ mod tests {
     #[ignore = "requires hardware"]
     #[serial]
     fn reopen_smoke() {
-        let sess = crate::tests::open();
+        let mut sess = crate::tests::open();
         sess.reopen().expect("reopen failed");
     }
 

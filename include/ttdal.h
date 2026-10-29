@@ -405,9 +405,11 @@ tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags);
 /// out-of-band reset. After a removal, the reopen reports `ENODEV` instead.
 ///
 /// The reopen restores only the session handle. TLB allocations do not survive
-/// it, and any requested power state is dropped with the old descriptor. The
-/// stale descriptor is always released, so a failed reopen leaves the session
-/// closed (`sess->fd` is `-1`).
+/// it, and any requested power state is dropped with the old descriptor. Ensure
+/// each TLB allocated through the session is freed first, as the new descriptor
+/// may be handed the same TLB IDs, which a stale TLB would then free or rebind.
+/// The stale descriptor is always released, so a failed reopen leaves the
+/// session closed (`sess->fd` is `-1`).
 ///
 /// @param sess  Session handle to reopen in place.
 /// @return      0 on success, -1 on error (check `errno`).
