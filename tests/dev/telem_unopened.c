@@ -9,7 +9,7 @@
 int main(void) {
     // Unopened session (fd = -1) must be rejected
     tt_session_t sess = { .dev = { .id = 0 }, .fd = -1 };
-    tt_telemetry_t table;
-    assert(tt_telemetry(&sess, table) < 0);
+    tt_telemetry_t table[1];
+    assert(tt_telemetry(&sess, 1, table) < 0);
     assert(errno == ENOTCONN);
 }

@@ -4,133 +4,107 @@
 
 //! Chip telemetry.
 //!
-//! Provides a snapshot of runtime sensor and status values reported
-//! by the device firmware. Values are a flat array of `u32`s indexed
-//! by [`Tag`] variants, each corresponding to a specific measurement
-//! such as temperature, clock frequency, or power consumption.
+//! Provides a snapshot of runtime sensor and status values reported by the
+//! device firmware. A snapshot holds the firmware's telemetry table as read:
+//! one [`Entry`] per published tag, each pairing the firmware's tag number with
+//! its raw `u32` value, in the firmware's table order.
+//!
+//! The library neither names tags nor decodes values. The meaning and encoding
+//! of each tag are defined by the firmware, documented in
+//! [tt-system-firmware].
 //!
 //! # Usage
 //!
-//! Read a telemetry snapshot with [`Session::telemetry()`] and index
-//! into it using a [`Tag`] variant.
+//! Read a telemetry snapshot with [`Session::telemetry()`] and look up a value
+//! by its tag number.
 //!
 //! ```no_run
-//! # use ttdal::dev::{Device, Session, telem::Tag};
+//! # use ttdal::dev::{Device, Session};
 //! #
 //! # let dev = Device::scan().unwrap().next().unwrap();
 //! #
 //! let sess = Session::open(dev)?;
 //! let telem = sess.telemetry()?;
 //!
-//! let temp = telem[Tag::AsicTemperature];
-//! let aiclk = telem.get(Tag::AiClk);
+//! let aiclk = telem[14];
+//! let temp = telem.get(11);
+//! for entry in &telem {
+//!     println!("{}: {}", entry.tag, entry.raw);
+//! }
 //! #
 //! # Ok::<(), ttdal::Error>(())
 //! ```
+//!
+//! [tt-system-firmware]: https://github.com/tenstorrent/tt-system-firmware
 
 use crate::ffi;
 use std::ops::Index;
+use std::slice;
 
 use super::Session;
-use crate::{Result, err};
+use crate::{Error, Result};
 
-/// Telemetry tag.
-#[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Tag {
-    BoardIdHigh = ffi::TT_TAG_BOARD_ID_HIGH,
-    BoardIdLow = ffi::TT_TAG_BOARD_ID_LOW,
-    AsicId = ffi::TT_TAG_ASIC_ID,
-    HarvestingState = ffi::TT_TAG_HARVESTING_STATE,
-    UpdateTelemSpeed = ffi::TT_TAG_UPDATE_TELEM_SPEED,
-    Vcore = ffi::TT_TAG_VCORE,
-    Tdp = ffi::TT_TAG_TDP,
-    Tdc = ffi::TT_TAG_TDC,
-    VddLimits = ffi::TT_TAG_VDD_LIMITS,
-    ThmLimitShutdown = ffi::TT_TAG_THM_LIMIT_SHUTDOWN,
-    AsicTemperature = ffi::TT_TAG_ASIC_TEMPERATURE,
-    VregTemperature = ffi::TT_TAG_VREG_TEMPERATURE,
-    BoardTemperature = ffi::TT_TAG_BOARD_TEMPERATURE,
-    AiClk = ffi::TT_TAG_AICLK,
-    AxiClk = ffi::TT_TAG_AXICLK,
-    SmcClk = ffi::TT_TAG_SMCCLK,
-    L2CpuClk0 = ffi::TT_TAG_L2CPUCLK0,
-    L2CpuClk1 = ffi::TT_TAG_L2CPUCLK1,
-    L2CpuClk2 = ffi::TT_TAG_L2CPUCLK2,
-    L2CpuClk3 = ffi::TT_TAG_L2CPUCLK3,
-    EthLiveStatus = ffi::TT_TAG_ETH_LIVE_STATUS,
-    GddrStatus = ffi::TT_TAG_GDDR_STATUS,
-    GddrSpeed = ffi::TT_TAG_GDDR_SPEED,
-    EthFwVersion = ffi::TT_TAG_ETH_FW_VERSION,
-    GddrFwVersion = ffi::TT_TAG_GDDR_FW_VERSION,
-    DmAppFwVersion = ffi::TT_TAG_DM_APP_FW_VERSION,
-    DmBlFwVersion = ffi::TT_TAG_DM_BL_FW_VERSION,
-    FlashBundleVersion = ffi::TT_TAG_FLASH_BUNDLE_VERSION,
-    CmFwVersion = ffi::TT_TAG_CM_FW_VERSION,
-    L2CpuFwVersion = ffi::TT_TAG_L2CPU_FW_VERSION,
-    FanSpeed = ffi::TT_TAG_FAN_SPEED,
-    TimerHeartbeat = ffi::TT_TAG_TIMER_HEARTBEAT,
-    EnabledTensixCol = ffi::TT_TAG_ENABLED_TENSIX_COL,
-    EnabledEth = ffi::TT_TAG_ENABLED_ETH,
-    EnabledGddr = ffi::TT_TAG_ENABLED_GDDR,
-    EnabledL2Cpu = ffi::TT_TAG_ENABLED_L2CPU,
-    PcieUsage = ffi::TT_TAG_PCIE_USAGE,
-    InputCurrent = ffi::TT_TAG_INPUT_CURRENT,
-    NocTranslation = ffi::TT_TAG_NOC_TRANSLATION,
-    FanRpm = ffi::TT_TAG_FAN_RPM,
-    Gddr01Temp = ffi::TT_TAG_GDDR_0_1_TEMP,
-    Gddr23Temp = ffi::TT_TAG_GDDR_2_3_TEMP,
-    Gddr45Temp = ffi::TT_TAG_GDDR_4_5_TEMP,
-    Gddr67Temp = ffi::TT_TAG_GDDR_6_7_TEMP,
-    Gddr01CorrErrs = ffi::TT_TAG_GDDR_0_1_CORR_ERRS,
-    Gddr23CorrErrs = ffi::TT_TAG_GDDR_2_3_CORR_ERRS,
-    Gddr45CorrErrs = ffi::TT_TAG_GDDR_4_5_CORR_ERRS,
-    Gddr67CorrErrs = ffi::TT_TAG_GDDR_6_7_CORR_ERRS,
-    GddrUncorrErrs = ffi::TT_TAG_GDDR_UNCORR_ERRS,
-    MaxGddrTemp = ffi::TT_TAG_MAX_GDDR_TEMP,
-    AsicLocation = ffi::TT_TAG_ASIC_LOCATION,
-    BoardPowerLimit = ffi::TT_TAG_BOARD_POWER_LIMIT,
-    InputPower = ffi::TT_TAG_INPUT_POWER,
-    TdcLimitMax = ffi::TT_TAG_TDC_LIMIT_MAX,
-    ThmLimitThrottle = ffi::TT_TAG_THM_LIMIT_THROTTLE,
-    FwBuildDate = ffi::TT_TAG_FW_BUILD_DATE,
-    TtFlashVersion = ffi::TT_TAG_TT_FLASH_VERSION,
-    EnabledTensixRow = ffi::TT_TAG_ENABLED_TENSIX_ROW,
-    ThermTripCount = ffi::TT_TAG_THERM_TRIP_COUNT,
-    AsicIdHigh = ffi::TT_TAG_ASIC_ID_HIGH,
-    AsicIdLow = ffi::TT_TAG_ASIC_ID_LOW,
-    AiClkLimitMax = ffi::TT_TAG_AICLK_LIMIT_MAX,
-    TdpLimitMax = ffi::TT_TAG_TDP_LIMIT_MAX,
-    AiClkArbMin = ffi::TT_TAG_AICLK_ARB_MIN,
-    AiClkArbMax = ffi::TT_TAG_AICLK_ARB_MAX,
-    EnabledMinArb = ffi::TT_TAG_ENABLED_MIN_ARB,
-    EnabledMaxArb = ffi::TT_TAG_ENABLED_MAX_ARB,
+/// Telemetry entry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Entry {
+    /// Firmware tag number.
+    pub tag: u16,
+    /// Raw telemetry value.
+    pub raw: u32,
 }
 
-/// A snapshot of device telemetry values, indexed by [`Tag`].
-#[derive(Clone, Debug, PartialEq)]
-pub struct Telemetry([u32; ffi::TT_TELEMETRY_LEN as usize]);
+/// A snapshot of device telemetry, in the firmware's table order.
+///
+/// Tags the firmware does not publish are absent.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Telemetry(Vec<Entry>);
 
 impl Telemetry {
-    /// Returns the value for `tag`, or `None` if the tag is out of range.
+    /// Returns the raw value for `tag`, or `None` if the tag is absent.
     #[must_use]
-    pub fn get(&self, tag: Tag) -> Option<u32> {
-        self.0.get(tag as usize).copied()
+    pub fn get(&self, tag: u16) -> Option<u32> {
+        self.0
+            .iter()
+            .find(|entry| entry.tag == tag)
+            .map(|entry| entry.raw)
+    }
+
+    /// Returns an iterator over the entries, in the firmware's table order.
+    pub fn iter(&self) -> slice::Iter<'_, Entry> {
+        self.0.iter()
     }
 }
 
-impl Index<Tag> for Telemetry {
+impl Index<u16> for Telemetry {
     type Output = u32;
 
-    fn index(&self, tag: Tag) -> &u32 {
-        &self.0[tag as usize]
+    /// Returns a reference to the raw value for `tag`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the tag is absent.
+    fn index(&self, tag: u16) -> &u32 {
+        self.0
+            .iter()
+            .find(|entry| entry.tag == tag)
+            .map(|entry| &entry.raw)
+            .expect("telemetry tag absent")
+    }
+}
+
+impl<'a> IntoIterator for &'a Telemetry {
+    type Item = &'a Entry;
+    type IntoIter = slice::Iter<'a, Entry>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
 impl Session {
     /// Reads a complete telemetry snapshot.
     ///
-    /// Tags the firmware does not report read as zero.
+    /// Tags the firmware does not publish are absent.
     ///
     /// # Errors
     ///
@@ -145,11 +119,93 @@ impl Session {
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn telemetry(&self) -> Result<Telemetry> {
         self.perform(|sess| {
-            let mut table = [0u32; ffi::TT_TELEMETRY_LEN as usize];
-            // SAFETY: `sess` is an open device and `table` is valid for
-            // `TT_TELEMETRY_LEN` u32 writes.
-            err::check(unsafe { ffi::tt_telemetry(sess.as_ptr(), table.as_mut_ptr()) })?;
-            Ok(Telemetry(table))
+            // Grow-and-retry until all entries fit.
+            //
+            // `tt_telemetry` returns the total entry count even when it exceeds
+            // `cap`. If that happens, set the new cap to twice the observed
+            // count and retry.
+            let mut cap = 128usize;
+            let mut buf = Vec::<ffi::tt_telemetry_t>::with_capacity(cap);
+
+            // Iterate until all entries read
+            let len = loop {
+                // Ensure buffer allocation is large enough
+                buf.reserve(cap);
+
+                // SAFETY: `sess` is an open device, and `buf` has capacity
+                // for at least `cap` elements, so `buf.as_mut_ptr()` is valid
+                // for writes of `cap` `tt_telemetry_t`s.
+                let found = unsafe { ffi::tt_telemetry(sess.as_ptr(), cap, buf.as_mut_ptr()) };
+
+                // Check if capacity was large enough for the table
+                match usize::try_from(found) {
+                    // Read failed, report error.
+                    Err(_) => return Err(Error::last_error()),
+                    // All entries fit in buffer.
+                    Ok(len) if len <= cap => break len,
+                    // Too small, grow and retry.
+                    Ok(len) => cap = len * 2,
+                }
+            };
+
+            // SAFETY: `len` holds the exact number of entries initialized by
+            // `tt_telemetry` and does not exceed the allocated capacity.
+            unsafe { buf.set_len(len) };
+
+            // Convert each raw entry
+            let entries = buf
+                .into_iter()
+                .map(|entry| Entry {
+                    tag: entry.tag,
+                    raw: entry.raw,
+                })
+                .collect();
+            Ok(Telemetry(entries))
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serial_test::serial;
+
+    use super::*;
+
+    /// Returns two entries, out of tag order.
+    fn sample() -> Telemetry {
+        Telemetry(vec![Entry { tag: 32, raw: 7 }, Entry { tag: 14, raw: 800 }])
+    }
+
+    #[test]
+    fn telemetry_get() {
+        let telem = sample();
+        assert_eq!(telem.get(14), Some(800));
+        assert_eq!(telem.get(1), None);
+    }
+
+    #[test]
+    fn telemetry_index() {
+        assert_eq!(sample()[32], 7);
+    }
+
+    #[test]
+    #[should_panic(expected = "telemetry tag absent")]
+    fn telemetry_index_absent() {
+        let _ = sample()[1];
+    }
+
+    #[test]
+    fn telemetry_iter() {
+        let tags: Vec<_> = sample().iter().map(|entry| entry.tag).collect();
+        assert_eq!(tags, [32, 14]);
+    }
+
+    #[test]
+    #[ignore = "requires hardware"]
+    #[serial]
+    fn telemetry_smoke() {
+        let telem = crate::tests::open().telemetry().expect("telemetry failed");
+        // Firmware heartbeat is tag 32
+        assert!(telem.get(32).is_some_and(|beat| beat != 0));
     }
 }

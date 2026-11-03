@@ -67,7 +67,7 @@ commit message.
 - Device discovery and lifecycle management
 - TLB allocations for memory-mapped I/O
 - System Management Controller (SMC) messaging
-- Telemetry snapshots
+- Raw telemetry snapshots
 - Power state management
 - Reset operations
 

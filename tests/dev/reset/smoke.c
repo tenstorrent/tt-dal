@@ -23,7 +23,7 @@ int main(void) {
     // Session must still be usable after reset.
     //
     // Telemetry needs the device reinitialized, which info queries do not.
-    tt_telemetry_t table;
-    assert(tt_telemetry(&sess, table) == 0);
+    tt_telemetry_t table[256];
+    assert(tt_telemetry(&sess, 256, table) >= 0);
     assert(tt_close(&sess) == 0);
 }

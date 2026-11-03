@@ -814,193 +814,59 @@ tt_smc_wait(const tt_session_t *sess, tt_smc_msg_t *rsp, uint32_t timeout);
  * Raw telemetry data read from device.                                       *
  *============================================================================*/
 
-/// Telemetry tags.
-typedef enum tt_telemetry_tag {
-    /// Invalid/reserved tag (index 0 is unused).
-    TT_TAG_INVALID              = 0,
-    /// High part of the board ID.
-    TT_TAG_BOARD_ID_HIGH        = 1,
-    /// Low part of the board ID.
-    TT_TAG_BOARD_ID_LOW         = 2,
-    /// ASIC ID.
-    TT_TAG_ASIC_ID              = 3,
-    /// Harvesting state of the system.
-    TT_TAG_HARVESTING_STATE     = 4,
-    /// Update interval for telemetry in milliseconds.
-    TT_TAG_UPDATE_TELEM_SPEED   = 5,
-    /// VCore voltage in millivolts.
-    TT_TAG_VCORE                = 6,
-    /// Thermal design power (TDP) in watts.
-    TT_TAG_TDP                  = 7,
-    /// Thermal design current (TDC) in amperes.
-    TT_TAG_TDC                  = 8,
-    /// VDD limits (min and max) in millivolts.
-    TT_TAG_VDD_LIMITS           = 9,
-    /// Thermal shutdown limit in degrees Celsius.
-    TT_TAG_THM_LIMIT_SHUTDOWN   = 10,
-    /// ASIC temperature in signed 16.16 fixed-point format.
-    TT_TAG_ASIC_TEMPERATURE     = 11,
-    /// Voltage regulator temperature in degrees Celsius (not implemented).
-    TT_TAG_VREG_TEMPERATURE     = 12,
-    /// Board temperature in degrees Celsius (not implemented).
-    TT_TAG_BOARD_TEMPERATURE    = 13,
-    /// AI clock frequency in megahertz.
-    TT_TAG_AICLK                = 14,
-    /// AXI clock frequency in megahertz.
-    TT_TAG_AXICLK               = 15,
-    /// SMC clock frequency in megahertz.
-    TT_TAG_SMCCLK               = 16,
-    /// L2CPU clock 0 frequency in megahertz.
-    TT_TAG_L2CPUCLK0            = 17,
-    /// L2CPU clock 1 frequency in megahertz.
-    TT_TAG_L2CPUCLK1            = 18,
-    /// L2CPU clock 2 frequency in megahertz.
-    TT_TAG_L2CPUCLK2            = 19,
-    /// L2CPU clock 3 frequency in megahertz.
-    TT_TAG_L2CPUCLK3            = 20,
-    /// Ethernet live status.
-    TT_TAG_ETH_LIVE_STATUS      = 21,
-    /// GDDR status.
-    TT_TAG_GDDR_STATUS          = 22,
-    /// GDDR speed in megabits per second.
-    TT_TAG_GDDR_SPEED           = 23,
-    /// Ethernet firmware version.
-    TT_TAG_ETH_FW_VERSION       = 24,
-    /// GDDR firmware version.
-    TT_TAG_GDDR_FW_VERSION      = 25,
-    /// DM application firmware version.
-    TT_TAG_DM_APP_FW_VERSION    = 26,
-    /// DM bootloader firmware version.
-    TT_TAG_DM_BL_FW_VERSION     = 27,
-    /// Flash bundle version.
-    TT_TAG_FLASH_BUNDLE_VERSION = 28,
-    /// CM firmware version.
-    TT_TAG_CM_FW_VERSION        = 29,
-    /// L2CPU firmware version.
-    TT_TAG_L2CPU_FW_VERSION     = 30,
-    /// Fan speed as a percentage.
-    TT_TAG_FAN_SPEED            = 31,
-    /// Timer heartbeat counter.
-    TT_TAG_TIMER_HEARTBEAT      = 32,
-    /// Total number of telemetry tags.
-    TT_TAG_TELEM_ENUM_COUNT     = 33,
-    /// Enabled Tensix columns.
-    TT_TAG_ENABLED_TENSIX_COL   = 34,
-    /// Enabled Ethernet interfaces.
-    TT_TAG_ENABLED_ETH          = 35,
-    /// Enabled GDDR interfaces.
-    TT_TAG_ENABLED_GDDR         = 36,
-    /// Enabled L2CPU cores.
-    TT_TAG_ENABLED_L2CPU        = 37,
-    /// PCIe usage information.
-    TT_TAG_PCIE_USAGE           = 38,
-    /// Input current in amperes.
-    TT_TAG_INPUT_CURRENT        = 39,
-    /// NOC translation status.
-    TT_TAG_NOC_TRANSLATION      = 40,
-    /// Fan RPM.
-    TT_TAG_FAN_RPM              = 41,
-    /// GDDR 0 and 1 temperature.
-    TT_TAG_GDDR_0_1_TEMP        = 42,
-    /// GDDR 2 and 3 temperature.
-    TT_TAG_GDDR_2_3_TEMP        = 43,
-    /// GDDR 4 and 5 temperature.
-    TT_TAG_GDDR_4_5_TEMP        = 44,
-    /// GDDR 6 and 7 temperature.
-    TT_TAG_GDDR_6_7_TEMP        = 45,
-    /// GDDR 0 and 1 corrected errors.
-    TT_TAG_GDDR_0_1_CORR_ERRS   = 46,
-    /// GDDR 2 and 3 corrected errors.
-    TT_TAG_GDDR_2_3_CORR_ERRS   = 47,
-    /// GDDR 4 and 5 corrected errors.
-    TT_TAG_GDDR_4_5_CORR_ERRS   = 48,
-    /// GDDR 6 and 7 corrected errors.
-    TT_TAG_GDDR_6_7_CORR_ERRS   = 49,
-    /// GDDR uncorrected errors.
-    TT_TAG_GDDR_UNCORR_ERRS     = 50,
-    /// Maximum GDDR temperature.
-    TT_TAG_MAX_GDDR_TEMP        = 51,
-    /// ASIC location.
-    TT_TAG_ASIC_LOCATION        = 52,
-    /// Board power limit in watts.
-    TT_TAG_BOARD_POWER_LIMIT    = 53,
-    /// Input power in watts.
-    TT_TAG_INPUT_POWER          = 54,
-    /// Maximum TDC limit in amperes.
-    TT_TAG_TDC_LIMIT_MAX        = 55,
-    /// Thermal throttle limit in degrees Celsius.
-    TT_TAG_THM_LIMIT_THROTTLE   = 56,
-    /// Firmware build date.
-    TT_TAG_FW_BUILD_DATE        = 57,
-    /// TT flash version.
-    TT_TAG_TT_FLASH_VERSION     = 58,
-    /// Enabled Tensix rows.
-    TT_TAG_ENABLED_TENSIX_ROW   = 59,
-    /// Thermal trip count.
-    TT_TAG_THERM_TRIP_COUNT     = 60,
-    /// High part of the ASIC ID.
-    TT_TAG_ASIC_ID_HIGH         = 61,
-    /// Low part of the ASIC ID.
-    TT_TAG_ASIC_ID_LOW          = 62,
-    /// Maximum AI clock frequency.
-    TT_TAG_AICLK_LIMIT_MAX      = 63,
-    /// Maximum TDP limit in watts.
-    TT_TAG_TDP_LIMIT_MAX        = 64,
-    /// Effective minimum AICLK arbiter value in megahertz.
-    ///
-    /// This represents the highest frequency requested by all enabled
-    /// minimum arbiters. Multiple arbiters may request minimum
-    /// frequencies, and the highest value is effective.
-    TT_TAG_AICLK_ARB_MIN        = 65,
-    /// Effective maximum AICLK arbiter value in megahertz.
-    ///
-    /// This represents the lowest frequency limit imposed by all
-    /// enabled maximum arbiters. Multiple arbiters may impose maximum
-    /// frequency limits (e.g., TDP, TDC, thermal throttling), and the
-    /// lowest (most restrictive) value is effective. This value takes
-    /// precedence over TT_TAG_AICLK_ARB_MIN when determining the
-    /// final target frequency.
-    TT_TAG_AICLK_ARB_MAX        = 66,
-    /// Bitmask of enabled minimum arbiters.
-    ///
-    /// Each bit represents whether a specific minimum frequency arbiter is
-    /// currently enabled.
-    TT_TAG_ENABLED_MIN_ARB      = 67,
-    /// Bitmask of enabled maximum arbiters.
-    ///
-    /// Each bit represents whether a specific maximum frequency arbiter is
-    /// currently enabled.
-    TT_TAG_ENABLED_MAX_ARB      = 68,
-    /// Sentinel value for telemetry array length.
-    TT_TELEMETRY_LEN,
-} tt_telemetry_tag_t;
-
-/// Telemetry data.
+/// Telemetry entry.
 ///
-/// Array indexed by `tt_telemetry_tag_t`.
-typedef uint32_t tt_telemetry_t[TT_TELEMETRY_LEN];
+/// One entry of the firmware's telemetry table: a tag number and the value
+/// published under it. The library neither names tags nor decodes values. The
+/// meaning and encoding of each tag are defined by the firmware, documented in
+/// [tt-system-firmware](https://github.com/tenstorrent/tt-system-firmware).
+typedef struct tt_telemetry {
+    /// Firmware tag number.
+    uint16_t tag;
+    /// Raw telemetry value.
+    uint32_t raw;
+} tt_telemetry_t;
 
 /// Read telemetry from device.
 ///
-/// Returns a complete, coherent snapshot rather than a partial read. The
-/// table is zeroed before filling, and tags the firmware does not report
-/// read as zero. Values are verified against the firmware heartbeat, with
-/// up to three retries on a mismatch.
+/// Reads a complete, coherent snapshot of the firmware's telemetry table. Fills
+/// buffer with up to `cap` entries, in the firmware's table order, skipping
+/// empty slots (tag 0). Return value may exceed `cap` if the table holds more
+/// entries. Each tag appears at most once, and tags the firmware does not
+/// publish are absent. When the firmware publishes a heartbeat, values are
+/// verified against it, with up to three retries on a mismatch.
 ///
-/// @param sess         Session handle.
-/// @param[out] table   Telemetry data output.
-/// @return             0 on success, -1 on error (check `errno`).
+/// @param sess      Session handle.
+/// @param cap       Capacity of output buffer.
+/// @param[out] buf  Buffer for telemetry entries.
+/// @return          Number of entries in the table (may exceed `cap`), negative
+///                  on error.
 ///
 /// @par Errors
 ///
-/// * `EINVAL`     `sess` or `table` is `NULL`.
+/// * `EINVAL`     `sess` is `NULL`.
 /// * `ENOTCONN`   The session is not open.
 /// * `ECONNRESET` The session was severed by an out-of-band reset or removal.
 /// * `EIO`        Telemetry data was malformed or could not be read.
 /// * `ENOTSUP`    The device architecture is unsupported.
 ///
 /// Other codes propagate from the failing system call.
-[[nodiscard]] int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table);
+///
+/// @par Example
+///
+/// ```c
+/// tt_telemetry_t telem[128];
+/// ssize_t count = tt_telemetry(&sess, 128, telem);
+/// if (count < 0)
+///     return count;
+///
+/// size_t actual = (count < 128) ? count : 128;
+/// for (size_t i = 0; i < actual; i++)
+///     printf("%u: %u\n", telem[i].tag, telem[i].raw);
+/// ```
+[[nodiscard]] ssize_t tt_telemetry(
+    const tt_session_t *sess, size_t cap, tt_telemetry_t buf[static cap]
+);
 
 /*============================================================================*
  * POWER                                                                      *

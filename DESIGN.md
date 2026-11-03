@@ -484,11 +484,13 @@ mechanism and lets callers decide what to request.
 #### Telemetry Snapshot API
 
 **TL;DR**: Read entire telemetry table in one operation for consistency and
-performance.
+performance, as raw values keyed by the firmware's tag numbers.
 
 Telemetry is designed around **complete snapshots** rather than individual tag
-queries. The API provides only `tt_telemetry()` which reads the entire
-telemetry table in a single operation.
+queries. The API provides only `tt_telemetry()` which reads the entire telemetry
+table in a single operation. Each entry pairs a tag number with its raw value,
+in the firmware's table order, and the caller sizes the buffer as for
+`tt_dev_scan()`.
 
 **Rationale**:
 
@@ -499,9 +501,16 @@ telemetry table in a single operation.
 2. **Performance**: The whole table is read through one mapped window in a
    single pass. Exposing per-tag reads would encourage inefficient usage
    patterns.
+3. **Firmware definitions**: The firmware defines what each tag means and how
+   its value is encoded, as documented in [tt-system-firmware]. The library
+   neither names tags nor decodes values, so a tag the firmware adds reaches
+   callers without a library release, and the same read serves every
+   architecture whatever tags its firmware publishes.
 
 Users who need only specific tags can read the full snapshot and ignore unused
 values. The table is small enough that this is negligible overhead.
+
+[tt-system-firmware]: https://github.com/tenstorrent/tt-system-firmware
 
 #### SMC Messaging
 

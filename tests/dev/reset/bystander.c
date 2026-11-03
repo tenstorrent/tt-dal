@@ -30,8 +30,8 @@ int main(void) {
     assert(tt_reset_with(&self, TT_RESET_FORCE) == 0);
 
     // The resetting session survives
-    tt_telemetry_t table;
-    assert(tt_telemetry(&self, table) == 0);
+    tt_telemetry_t table[256];
+    assert(tt_telemetry(&self, 256, table) >= 0);
 
     // The bystander does not
     assert(tt_dev_info(&other, &info) < 0);
@@ -43,6 +43,6 @@ int main(void) {
     // An exclusive session resets without forcing
     assert(tt_open(&dev, &self, TT_OPEN_EXCL) == 0);
     assert(tt_reset_with(&self, 0) == 0);
-    assert(tt_telemetry(&self, table) == 0);
+    assert(tt_telemetry(&self, 256, table) >= 0);
     assert(tt_close(&self) == 0);
 }

@@ -8,7 +8,6 @@
 #include "ttdal.h"
 
 #include <stdint.h>
-#include <string.h>
 
 // SMC address space
 #define CSM_BASE 0x10000000U   // core shared memory base address
@@ -28,16 +27,27 @@
 #define BH_SMC_NOC_Y 0
 
 // Limits
-#define TELEM_ENTRY_CAP 128U
+#define TELEM_ENTRY_MAX 65536U // sanity bound on the entry count
+
+// Tags
+#define TELEM_HEARTBEAT 32U // TIMER_HEARTBEAT, advances each update
 
 /// Snapshot firmware telemetry.
-static int
-snapshot(const volatile uint32_t *, const volatile uint32_t *, tt_telemetry_t);
+static ssize_t snapshot(
+    const volatile uint32_t *,
+    size_t,
+    const volatile uint32_t *,
+    size_t,
+    size_t,
+    tt_telemetry_t *
+);
 
 /// Get device telemetry.
-int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table) {
+ssize_t tt_telemetry(
+    const tt_session_t *sess, size_t cap, tt_telemetry_t buf[static cap]
+) {
     // Validate args
-    if (!sess || !table)
+    if (!sess)
         return tt_fail(EINVAL);
 
     // Ensure session is open
@@ -68,9 +78,6 @@ int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table) {
         default:
             return tt_fail(ENOTSUP);
     }
-
-    // Zero-initialize table
-    memset(table, 0, sizeof(tt_telemetry_t));
 
     // Allocate TLB
     tt_tlb_t tlb;
@@ -136,6 +143,10 @@ int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table) {
         (const volatile uint32_t *)((uint8_t *)tlb.ptr +
                                     (ptrs.data & (TT_TLB_2MB - 1)));
 
+    // Compute words left in CSM
+    size_t tags_len = (CSM_BASE + CSM_SIZE - ptrs.tags) / sizeof(uint32_t);
+    size_t data_len = (CSM_BASE + CSM_SIZE - ptrs.data) / sizeof(uint32_t);
+
     // Guard the snapshot reads at the window's new mapping
     tt_trap_arm(tlb.ptr, TT_TLB_2MB);
     if (sigsetjmp(tt_trap_jmp, 1)) {
@@ -144,11 +155,12 @@ int tt_telemetry(const tt_session_t *sess, tt_telemetry_t table) {
     }
 
     // Read telemetry snapshot
-    if (snapshot(tags, data, table) != 0)
+    ssize_t len = snapshot(tags, tags_len, data, data_len, cap, buf);
+    if (len < 0)
         goto cleanup;
     tt_trap_disarm();
     (void)tt_tlb_free(sess, &tlb);
-    return TT_OK;
+    return len;
 
 cleanup:
     // Preserve the failure cause across the cleanup
@@ -160,61 +172,76 @@ cleanup:
 
 /// Snapshot firmware telemetry.
 ///
+/// Walks the tag table at `tbl`, which may span at most `tbl_len` words, and
+/// reads each value from the `data_len` words at `data`. Writes up to `cap`
+/// entries to `buf`.
+///
 /// Retries up to 3 times on heartbeat mismatch. A stable `TIMER_HEARTBEAT`
 /// before/after the read guarantees all values are from the same update cycle.
 ///
-/// @return `TT_ERR` if all 3 heartbeat attempts fail.
-static int snapshot(
+/// @return Number of entries, or `TT_ERR` if the table is malformed or all
+///         three heartbeat attempts fail.
+static ssize_t snapshot(
     const volatile uint32_t *tbl,
+    size_t tbl_len,
     const volatile uint32_t *data,
-    tt_telemetry_t table
+    size_t data_len,
+    size_t cap,
+    tt_telemetry_t *buf
 ) {
-    // Clamp entry count
+    // Validate entry count
+    if (tbl_len < 2)
+        return tt_fail(EIO);
     uint32_t count = tbl[1];
-    if (count > TELEM_ENTRY_CAP)
-        count = TELEM_ENTRY_CAP;
+    if (count > TELEM_ENTRY_MAX || count > tbl_len - 2)
+        return tt_fail(EIO);
 
-    // Build offset map
-    //
-    // Uses `0xffff` as a sentinel value to denote an unset entry.
-    uint16_t map[TT_TELEMETRY_LEN];
-    memset(map, 0xff, sizeof(map));
-    for (uint32_t idx = 0; idx < count; idx++) {
-        // Read offset for tag
+    // Locate heartbeat
+    int32_t beat = -1;
+    for (uint32_t idx = 0; idx < count && beat < 0; idx++) {
         uint32_t entry = tbl[2 + idx];
         uint16_t tag   = (uint16_t)(entry & 0xffff);
         uint16_t off   = (uint16_t)(entry >> 16);
-        // Ensure tag in bounds
-        if (tag == 0 || tag >= TT_TELEMETRY_LEN)
-            continue;
-        // Ensure tag isn't set
-        if (map[tag] != 0xffff)
-            return tt_fail(EIO);
-        // Record tag offset
-        map[tag] = off;
+        if (tag == TELEM_HEARTBEAT && off < data_len)
+            beat = off;
     }
 
     // Attempt to read a coherent snapshot
     for (int try = 0; try < 3; try++) {
         // Fetch heartbeat
         uint32_t tick = 0;
-        if (map[TT_TAG_TIMER_HEARTBEAT] != 0xffff)
-            tick = data[map[TT_TAG_TIMER_HEARTBEAT]];
+        if (beat >= 0)
+            tick = data[beat];
 
         // Read telemetry table
-        for (int tag = 1; tag < TT_TELEMETRY_LEN; tag++) {
-            if (map[tag] != 0xffff)
-                table[tag] = data[map[tag]];
+        uint64_t seen[(UINT16_MAX + 1) / 64] = { 0 };
+
+        size_t len = 0;
+        for (uint32_t idx = 0; idx < count; idx++) {
+            // Read offset for tag
+            uint32_t entry = tbl[2 + idx];
+            uint16_t tag   = (uint16_t)(entry & 0xffff);
+            uint16_t off   = (uint16_t)(entry >> 16);
+            // Skip empty slots
+            if (tag == 0)
+                continue;
+            // Ensure offset in bounds
+            if (off >= data_len)
+                return tt_fail(EIO);
+            // Ensure tag isn't repeated
+            uint64_t bit = UINT64_C(1) << (tag % 64);
+            if (seen[tag / 64] & bit)
+                return tt_fail(EIO);
+            seen[tag / 64] |= bit;
+            // Record entry
+            if (len < cap)
+                buf[len] = (tt_telemetry_t){ .tag = tag, .raw = data[off] };
+            len++;
         }
 
         // Check coherency
-        if (map[TT_TAG_TIMER_HEARTBEAT] == 0xffff)
-            return TT_OK;
-        if (tick == data[map[TT_TAG_TIMER_HEARTBEAT]])
-            return TT_OK;
-
-        // Reset on mismatch
-        memset(table, 0, sizeof(tt_telemetry_t));
+        if (beat < 0 || tick == data[beat])
+            return (ssize_t)len;
     }
 
     return tt_fail(EIO);

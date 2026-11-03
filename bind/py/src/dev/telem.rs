@@ -4,126 +4,168 @@
 
 //! Chip telemetry.
 //!
-//! Provides a snapshot of runtime sensor and status values reported
-//! by the device firmware. Values are a flat array of `u32`s indexed
-//! by `Tag` variants, each corresponding to a specific measurement
-//! such as temperature, clock frequency, or power consumption.
+//! Provides a snapshot of runtime sensor and status values reported by the
+//! device firmware. A snapshot reads like a read-only mapping from each
+//! published tag number to its raw `u32` value, in the firmware's table order,
+//! and compares equal to any mapping with the same items, as a `dict` does.
+//!
+//! The library neither names tags nor decodes values. The meaning and encoding
+//! of each tag are defined by the firmware, documented in
+//! [tt-system-firmware].
+//!
+//! [tt-system-firmware]: https://github.com/tenstorrent/tt-system-firmware
 
 use crate::ffi;
+use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
+use pyo3::types::{IntoPyDict, PyBool, PyDict};
 
-/// Telemetry tag for indexing a `Telemetry` snapshot.
+/// A snapshot of device telemetry, in the firmware's table order.
 ///
-/// Each tag's integer value is its C tag number.
-#[pyclass(eq, eq_int, from_py_object)]
-#[derive(Clone, Copy, PartialEq)]
-pub enum Tag {
-    BoardIdHigh = ffi::TT_TAG_BOARD_ID_HIGH as isize,
-    BoardIdLow = ffi::TT_TAG_BOARD_ID_LOW as isize,
-    AsicId = ffi::TT_TAG_ASIC_ID as isize,
-    HarvestingState = ffi::TT_TAG_HARVESTING_STATE as isize,
-    UpdateTelemSpeed = ffi::TT_TAG_UPDATE_TELEM_SPEED as isize,
-    Vcore = ffi::TT_TAG_VCORE as isize,
-    Tdp = ffi::TT_TAG_TDP as isize,
-    Tdc = ffi::TT_TAG_TDC as isize,
-    VddLimits = ffi::TT_TAG_VDD_LIMITS as isize,
-    ThmLimitShutdown = ffi::TT_TAG_THM_LIMIT_SHUTDOWN as isize,
-    AsicTemperature = ffi::TT_TAG_ASIC_TEMPERATURE as isize,
-    VregTemperature = ffi::TT_TAG_VREG_TEMPERATURE as isize,
-    BoardTemperature = ffi::TT_TAG_BOARD_TEMPERATURE as isize,
-    AiClk = ffi::TT_TAG_AICLK as isize,
-    AxiClk = ffi::TT_TAG_AXICLK as isize,
-    SmcClk = ffi::TT_TAG_SMCCLK as isize,
-    L2CpuClk0 = ffi::TT_TAG_L2CPUCLK0 as isize,
-    L2CpuClk1 = ffi::TT_TAG_L2CPUCLK1 as isize,
-    L2CpuClk2 = ffi::TT_TAG_L2CPUCLK2 as isize,
-    L2CpuClk3 = ffi::TT_TAG_L2CPUCLK3 as isize,
-    EthLiveStatus = ffi::TT_TAG_ETH_LIVE_STATUS as isize,
-    GddrStatus = ffi::TT_TAG_GDDR_STATUS as isize,
-    GddrSpeed = ffi::TT_TAG_GDDR_SPEED as isize,
-    EthFwVersion = ffi::TT_TAG_ETH_FW_VERSION as isize,
-    GddrFwVersion = ffi::TT_TAG_GDDR_FW_VERSION as isize,
-    DmAppFwVersion = ffi::TT_TAG_DM_APP_FW_VERSION as isize,
-    DmBlFwVersion = ffi::TT_TAG_DM_BL_FW_VERSION as isize,
-    FlashBundleVersion = ffi::TT_TAG_FLASH_BUNDLE_VERSION as isize,
-    CmFwVersion = ffi::TT_TAG_CM_FW_VERSION as isize,
-    L2CpuFwVersion = ffi::TT_TAG_L2CPU_FW_VERSION as isize,
-    FanSpeed = ffi::TT_TAG_FAN_SPEED as isize,
-    TimerHeartbeat = ffi::TT_TAG_TIMER_HEARTBEAT as isize,
-    EnabledTensixCol = ffi::TT_TAG_ENABLED_TENSIX_COL as isize,
-    EnabledEth = ffi::TT_TAG_ENABLED_ETH as isize,
-    EnabledGddr = ffi::TT_TAG_ENABLED_GDDR as isize,
-    EnabledL2Cpu = ffi::TT_TAG_ENABLED_L2CPU as isize,
-    PcieUsage = ffi::TT_TAG_PCIE_USAGE as isize,
-    InputCurrent = ffi::TT_TAG_INPUT_CURRENT as isize,
-    NocTranslation = ffi::TT_TAG_NOC_TRANSLATION as isize,
-    FanRpm = ffi::TT_TAG_FAN_RPM as isize,
-    Gddr01Temp = ffi::TT_TAG_GDDR_0_1_TEMP as isize,
-    Gddr23Temp = ffi::TT_TAG_GDDR_2_3_TEMP as isize,
-    Gddr45Temp = ffi::TT_TAG_GDDR_4_5_TEMP as isize,
-    Gddr67Temp = ffi::TT_TAG_GDDR_6_7_TEMP as isize,
-    Gddr01CorrErrs = ffi::TT_TAG_GDDR_0_1_CORR_ERRS as isize,
-    Gddr23CorrErrs = ffi::TT_TAG_GDDR_2_3_CORR_ERRS as isize,
-    Gddr45CorrErrs = ffi::TT_TAG_GDDR_4_5_CORR_ERRS as isize,
-    Gddr67CorrErrs = ffi::TT_TAG_GDDR_6_7_CORR_ERRS as isize,
-    GddrUncorrErrs = ffi::TT_TAG_GDDR_UNCORR_ERRS as isize,
-    MaxGddrTemp = ffi::TT_TAG_MAX_GDDR_TEMP as isize,
-    AsicLocation = ffi::TT_TAG_ASIC_LOCATION as isize,
-    BoardPowerLimit = ffi::TT_TAG_BOARD_POWER_LIMIT as isize,
-    InputPower = ffi::TT_TAG_INPUT_POWER as isize,
-    TdcLimitMax = ffi::TT_TAG_TDC_LIMIT_MAX as isize,
-    ThmLimitThrottle = ffi::TT_TAG_THM_LIMIT_THROTTLE as isize,
-    FwBuildDate = ffi::TT_TAG_FW_BUILD_DATE as isize,
-    TtFlashVersion = ffi::TT_TAG_TT_FLASH_VERSION as isize,
-    EnabledTensixRow = ffi::TT_TAG_ENABLED_TENSIX_ROW as isize,
-    ThermTripCount = ffi::TT_TAG_THERM_TRIP_COUNT as isize,
-    AsicIdHigh = ffi::TT_TAG_ASIC_ID_HIGH as isize,
-    AsicIdLow = ffi::TT_TAG_ASIC_ID_LOW as isize,
-    AiClkLimitMax = ffi::TT_TAG_AICLK_LIMIT_MAX as isize,
-    TdpLimitMax = ffi::TT_TAG_TDP_LIMIT_MAX as isize,
-    AiClkArbMin = ffi::TT_TAG_AICLK_ARB_MIN as isize,
-    AiClkArbMax = ffi::TT_TAG_AICLK_ARB_MAX as isize,
-    EnabledMinArb = ffi::TT_TAG_ENABLED_MIN_ARB as isize,
-    EnabledMaxArb = ffi::TT_TAG_ENABLED_MAX_ARB as isize,
-}
-
-impl Tag {
-    /// Returns the raw telemetry tag index.
-    fn as_raw(&self) -> u32 {
-        *self as u32
-    }
-}
-
-/// A snapshot of device telemetry values, indexed by `Tag`.
-#[pyclass]
+/// Reads like a read-only mapping from tag number to raw value, and is
+/// registered as a `collections.abc.Mapping`. Tags the firmware does not
+/// publish are absent. `keys()`, `values()` and `items()` return the views from
+/// `collections.abc`.
+///
+/// Compares equal to any mapping with the same items, in any order, as a `dict`
+/// does. Like a `dict`, it is unhashable.
+#[pyclass(frozen, mapping)]
 pub struct Telemetry {
-    data: Vec<u32>,
+    entries: Vec<(u16, u32)>,
 }
 
 #[pymethods]
 impl Telemetry {
-    /// Returns the value for `tag`, or `None` if the tag is out of range.
-    fn get(&self, tag: Tag) -> Option<u32> {
-        self.data.get(tag.as_raw() as usize).copied()
+    /// Returns the raw value for `tag`, or `default` if the tag is absent.
+    #[pyo3(signature = (tag, default=None))]
+    fn get<'py>(
+        &self,
+        tag: &Bound<'py, PyAny>,
+        default: Option<Bound<'py, PyAny>>,
+    ) -> PyResult<Option<Bound<'py, PyAny>>> {
+        let Some(raw) = self.lookup(tag)? else {
+            return Ok(default);
+        };
+        Ok(Some(raw.into_pyobject(tag.py())?.into_any()))
     }
 
-    /// Returns the value for `tag`.
+    /// Returns the raw value for `tag`.
     ///
-    /// Raises `IndexError` if the tag is out of range.
-    fn __getitem__(&self, tag: Tag) -> PyResult<u32> {
-        self.get(tag)
-            .ok_or_else(|| pyo3::exceptions::PyIndexError::new_err("telemetry tag out of range"))
+    /// Raises `KeyError` if the tag is absent.
+    fn __getitem__(&self, tag: &Bound<'_, PyAny>) -> PyResult<u32> {
+        self.lookup(tag)?
+            .ok_or_else(|| PyKeyError::new_err((tag.clone().unbind(),)))
+    }
+
+    /// Returns whether `tag` is present.
+    fn __contains__(&self, tag: &Bound<'_, PyAny>) -> PyResult<bool> {
+        Ok(self.lookup(tag)?.is_some())
+    }
+
+    /// Returns the number of tags.
+    fn __len__(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Iterates the tags, in the firmware's table order.
+    fn __iter__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        iterate(py, self.entries.iter().map(|(tag, _)| *tag))
+    }
+
+    /// Iterates the tags, in reverse table order.
+    fn __reversed__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        iterate(py, self.entries.iter().rev().map(|(tag, _)| *tag))
+    }
+
+    /// Returns a view of the tags, in the firmware's table order.
+    fn keys<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyAny>> {
+        view(slf, "KeysView")
+    }
+
+    /// Returns a view of the raw values, in the firmware's table order.
+    fn values<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyAny>> {
+        view(slf, "ValuesView")
+    }
+
+    /// Returns a view of the `(tag, raw)` pairs, in the firmware's table order.
+    fn items<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyAny>> {
+        view(slf, "ItemsView")
+    }
+
+    /// Returns whether `other` is a mapping with the same items.
+    ///
+    /// Returns `NotImplemented` if `other` is not a mapping.
+    fn __eq__(&self, other: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        let eq = self.compare(other)?;
+        Ok(verdict(other.py(), eq))
+    }
+
+    /// Returns whether `other` is a mapping with different items.
+    ///
+    /// Returns `NotImplemented` if `other` is not a mapping.
+    fn __ne__(&self, other: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        let ne = self.compare(other)?.map(|eq| !eq);
+        Ok(verdict(other.py(), ne))
     }
 
     fn __repr__(&self) -> String {
-        format!("Telemetry([{} entries])", self.data.len())
+        format!("Telemetry([{} entries])", self.entries.len())
     }
 }
 
 impl Telemetry {
-    /// Wraps a raw telemetry table.
-    pub(crate) fn from_raw(data: Vec<u32>) -> Self {
-        Self { data }
+    /// Returns the raw value for `tag`, if `tag` is a present tag number.
+    ///
+    /// Matches keys as a `dict` does, so `1.0` finds tag `1`, and raises
+    /// `TypeError` if `tag` is unhashable.
+    fn lookup(&self, tag: &Bound<'_, PyAny>) -> PyResult<Option<u32>> {
+        let Ok(key) = u16::try_from(tag.hash()?) else {
+            return Ok(None);
+        };
+        let found = self.entries.iter().find(|(entry, _)| *entry == key);
+        let Some(&(_, raw)) = found else {
+            return Ok(None);
+        };
+        Ok(tag.eq(key)?.then_some(raw))
+    }
+
+    /// Returns whether `other` is a mapping with the same items, or `None` if
+    /// `other` is not a mapping.
+    ///
+    /// Compares as `collections.abc.Mapping` does, by building a `dict` from
+    /// each side's items.
+    fn compare(&self, other: &Bound<'_, PyAny>) -> PyResult<Option<bool>> {
+        let py = other.py();
+        let mapping = py.import("collections.abc")?.getattr("Mapping")?;
+        if !other.is_instance(&mapping)? {
+            return Ok(None);
+        }
+        let lhs = self.entries.iter().copied().into_py_dict(py)?;
+        let items = other.call_method0("items")?;
+        let rhs = py.get_type::<PyDict>().call1((items,))?;
+        lhs.eq(rhs).map(Some)
+    }
+}
+
+/// Returns a Python iterator over `tags`.
+fn iterate(py: Python<'_>, tags: impl Iterator<Item = u16>) -> PyResult<Bound<'_, PyAny>> {
+    let tags: Vec<u16> = tags.collect();
+    tags.into_pyobject(py)?.try_iter().map(Bound::into_any)
+}
+
+/// Returns the `collections.abc` view named `kind` over `slf`.
+fn view<'py>(slf: &Bound<'py, Telemetry>, kind: &str) -> PyResult<Bound<'py, PyAny>> {
+    slf.py()
+        .import("collections.abc")?
+        .getattr(kind)?
+        .call1((slf,))
+}
+
+/// Converts a comparison result to Python, with `None` as `NotImplemented`.
+fn verdict(py: Python<'_>, res: Option<bool>) -> Py<PyAny> {
+    match res {
+        Some(res) => PyBool::new(py, res).to_owned().into_any().unbind(),
+        None => py.NotImplemented(),
     }
 }
 
@@ -133,7 +175,7 @@ use super::Session;
 impl Session {
     /// Reads a complete telemetry snapshot.
     ///
-    /// Tags the firmware does not report read as zero.
+    /// Tags the firmware does not publish are absent.
     ///
     /// Raises `TTError` with:
     ///
@@ -146,11 +188,29 @@ impl Session {
     /// Other `errno` values propagate from the failing system call.
     pub fn telemetry(&mut self) -> PyResult<Telemetry> {
         self.perform(|sess| {
-            let mut table = vec![0u32; ffi::TT_TELEMETRY_LEN as usize];
-            // SAFETY: `sess` is an open device and table.as_mut_ptr() is valid
-            // for TT_TELEMETRY_LEN u32 writes.
-            crate::err::check(unsafe { ffi::tt_telemetry(sess, table.as_mut_ptr()) })?;
-            Ok(Telemetry::from_raw(table))
+            // Grow-and-retry until all entries fit. `tt_telemetry` returns the
+            // total count even when it exceeds cap, so retry with twice that.
+            let mut cap = 128usize;
+            let mut buf: Vec<ffi::tt_telemetry_t> = Vec::new();
+
+            let len = loop {
+                buf.reserve(cap);
+                // SAFETY: `sess` is an open device and `buf` has capacity for
+                // at least cap elements.
+                let found = unsafe { ffi::tt_telemetry(sess, cap, buf.as_mut_ptr()) };
+                match usize::try_from(found) {
+                    Err(_) => return Err(crate::err::check(-1).unwrap_err()),
+                    Ok(len) if len <= cap => break len,
+                    Ok(len) => cap = len * 2,
+                }
+            };
+
+            // SAFETY: `len` elements were initialized by tt_telemetry.
+            unsafe { buf.set_len(len) };
+            let entries = buf.into_iter().map(|entry| (entry.tag, entry.raw));
+            Ok(Telemetry {
+                entries: entries.collect(),
+            })
         })
     }
 }
