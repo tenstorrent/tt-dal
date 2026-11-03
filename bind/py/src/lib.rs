@@ -95,8 +95,10 @@ fn ttdal(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // telem submodule
     let telem = PyModule::new(py, "telem")?;
-    telem.add_class::<dev::telem::Tag>()?;
     telem.add_class::<dev::telem::Telemetry>()?;
+    py.import("collections.abc")?
+        .getattr("Mapping")?
+        .call_method1("register", (py.get_type::<dev::telem::Telemetry>(),))?;
     m.add_submodule(&telem)?;
     py.import("sys")?
         .getattr("modules")?
