@@ -126,8 +126,8 @@ impl Session {
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn power(&self, flags: impl Into<FlagSet>) -> Result<()> {
         let raw = flags.into().0;
-        // SAFETY: `sess` is an open device and `raw` is a valid bitmask.
-        self.perform(|sess| err::check(unsafe { ffi::tt_power(sess.as_ptr(), raw) }))
+        // SAFETY: `self` is an open session and `raw` is a valid bitmask.
+        err::check(unsafe { ffi::tt_power(self.as_ptr(), raw) })
     }
 }
 

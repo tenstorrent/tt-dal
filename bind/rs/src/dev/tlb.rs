@@ -214,17 +214,17 @@ impl Session {
     /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn alloc(&self, size: Size, mode: Caching) -> Result<Tlb<'_>> {
-        let raw = self.perform(|sess| {
-            let mut raw = std::mem::MaybeUninit::<ffi::tt_tlb_t>::uninit();
-            // SAFETY: `sess` is an open device and `raw` is a valid
-            // out-pointer for `tt_tlb_t`.
-            err::check(unsafe {
-                ffi::tt_tlb_alloc(sess.as_ptr(), size as u64, mode as u32, raw.as_mut_ptr())
-            })?;
-            // SAFETY: `raw` was fully initialized by the successful call above.
-            Ok(unsafe { raw.assume_init() })
+        let mut raw = std::mem::MaybeUninit::<ffi::tt_tlb_t>::uninit();
+        // SAFETY: `self` is an open session and `raw` is a valid out-pointer
+        // for `tt_tlb_t`.
+        err::check(unsafe {
+            ffi::tt_tlb_alloc(self.as_ptr(), size as u64, mode as u32, raw.as_mut_ptr())
         })?;
-        Ok(Tlb { raw, dev: self })
+        // SAFETY: `raw` was fully initialized by the successful call above.
+        Ok(Tlb {
+            raw: unsafe { raw.assume_init() },
+            dev: self,
+        })
     }
 }
 

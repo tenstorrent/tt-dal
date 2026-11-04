@@ -52,9 +52,6 @@ impl Session {
     /// message is dropped on any early return, leaving the session free to
     /// send again.
     ///
-    /// A persistent session does not reopen and retry a call, since a message
-    /// that ran before the reset would run twice.
-    ///
     /// # Errors
     ///
     /// Returns [`ConnectionReset`] if the session was severed by an out-of-band
