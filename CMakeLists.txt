@@ -14,6 +14,18 @@ project(
     LANGUAGES C
 )
 
+# Compatibility
+#
+# Before 1.0 a minor release may break compatibility, so versions match on
+# the minor version.
+if(PROJECT_VERSION_MAJOR EQUAL 0)
+    set(SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+    set(COMPAT SameMinorVersion)
+else()
+    set(SOVERSION ${PROJECT_VERSION_MAJOR})
+    set(COMPAT SameMajorVersion)
+endif()
+
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED YES)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -41,7 +53,7 @@ set_target_properties(ttdal PROPERTIES
     C_STANDARD_REQUIRED YES
     POSITION_INDEPENDENT_CODE ON
     VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
+    SOVERSION ${SOVERSION}
 )
 
 # Install
@@ -71,7 +83,7 @@ configure_package_config_file(
 write_basic_package_version_file(
     ${CMAKE_CURRENT_BINARY_DIR}/ttdalConfigVersion.cmake
     VERSION ${PROJECT_VERSION}
-    COMPATIBILITY SameMajorVersion
+    COMPATIBILITY ${COMPAT}
 )
 
 install(FILES
