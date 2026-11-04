@@ -78,18 +78,36 @@ impl Device {
     /// Creates a device descriptor from a PCIe bus/device/function (BDF)
     /// address (e.g., `"0000:03:00.0"`).
     ///
+    /// Briefly opens each connected device to read its address. The opens do
+    /// not wait for an exclusive holder: a device held exclusively, by another
+    /// client or by the caller, cannot be read, so it is skipped.
+    ///
+    /// This releases the interpreter lock while it opens devices.
+    ///
     /// Raises `TTError` with:
     ///
     /// - `EINVAL` if `addr` contains an interior nul byte or is malformed.
     /// - `ENODEV` if no connected device matches the address.
+    /// - `EAGAIN` if no device matches and at least one was skipped, since a
+    ///   skipped device may be the one sought. It is safe to retry once the
+    ///   holder releases the device.
     #[staticmethod]
-    pub fn from_bdf(addr: &str) -> PyResult<Self> {
+    pub fn from_bdf(py: Python<'_>, addr: &str) -> PyResult<Self> {
         let addr = CString::new(addr)
             .map_err(|_| crate::err::TTError::new_err((libc::EINVAL, "invalid address")))?;
-        let mut raw = MaybeUninit::<ffi::tt_device_t>::uninit();
-        // SAFETY: `addr` is a valid null-terminated C string and raw is a valid
-        // out-pointer for tt_device_t.
-        crate::err::check(unsafe { ffi::tt_dev_from_bdf(addr.as_ptr(), raw.as_mut_ptr()) })?;
+        let (rc, errno, raw) = py.detach(move || {
+            let mut raw = MaybeUninit::<ffi::tt_device_t>::uninit();
+            // SAFETY: `addr` is a valid null-terminated C string and raw is a
+            // valid out-pointer for tt_device_t.
+            let rc = unsafe { ffi::tt_dev_from_bdf(addr.as_ptr(), raw.as_mut_ptr()) };
+            // Read here, before reattaching can clobber it.
+            let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+            (rc, errno, raw)
+        });
+
+        if rc != 0 {
+            return Err(crate::err::fail(errno));
+        }
         // SAFETY: `raw` was fully initialized by the successful call above.
         Ok(Self(unsafe { raw.assume_init() }))
     }

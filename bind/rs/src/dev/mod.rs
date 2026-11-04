@@ -101,11 +101,19 @@ impl TryFrom<crate::pci::Address> for Device {
 
     /// Constructs a device descriptor for the device at the given PCI address.
     ///
+    /// Briefly opens each connected device to read its address. The opens do
+    /// not wait for an exclusive holder: a device held exclusively, by another
+    /// client or by the caller, cannot be read, so it is skipped.
+    ///
     /// # Errors
     ///
-    /// Returns `ENODEV`, observable via [`Error::raw_os_error()`], if no
-    /// connected device matches the address.
+    /// Returns [`WouldBlock`] if no device matches and at least one was
+    /// skipped, since a skipped device may be the one sought. It is safe to
+    /// retry once the holder releases the device. Returns `ENODEV`, observable
+    /// via [`Error::raw_os_error()`], if no connected device matches the
+    /// address.
     ///
+    /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     fn try_from(addr: crate::pci::Address) -> Result<Self> {
         let bdf = CString::new(addr.to_string())

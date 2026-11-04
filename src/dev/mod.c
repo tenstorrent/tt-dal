@@ -93,16 +93,27 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev) {
     // Device numbers can change when a device is removed and re-probed, so BDF
     // is the only reliable identifier for a specific physical device.
     //
-    // The buffer bound is an implementation convenience, not part of the
-    // function's contract. It is chosen to exceed the device count of any
-    // current system. A device beyond the bound would be missed, reporting
-    // `ENODEV`.
+    // The buffer bound is an implementation convenience outside the function's
+    // contract, chosen to exceed the device count of any current system. A
+    // device beyond the bound would be missed, as if it were absent.
+    //
+    // The open does not wait for an exclusive holder, and fails with `EAGAIN`
+    // instead. Such a device is skipped, but it may be the one sought, so the
+    // lookup reports `EAGAIN` when nothing else matches.
     tt_device_t devs[64];
-    ssize_t count = tt_dev_scan(sizeof(devs) / sizeof(devs[0]), devs);
-    for (ssize_t i = 0; i < count; i++) {
+    size_t cap    = sizeof(devs) / sizeof(devs[0]);
+    ssize_t found = tt_dev_scan(cap, devs);
+    size_t count  = (found > 0) ? (size_t)found : 0;
+    if (count > cap)
+        count = cap;
+    bool busy = false;
+    for (size_t i = 0; i < count; i++) {
         tt_session_t sess;
-        if (tt_open(&devs[i], &sess, 0) < 0)
+        if (tt_open(&devs[i], &sess, TT_OPEN_NONBLOCK) < 0) {
+            if (errno == EAGAIN)
+                busy = true;
             continue;
+        }
         tt_dev_info_t info;
         int res = tt_dev_info(&sess, &info);
         (void)tt_close(&sess);
@@ -125,7 +136,7 @@ int tt_dev_from_bdf(const char *addr, tt_device_t *dev) {
         }
     }
 
-    return tt_fail(ENODEV);
+    return tt_fail(busy ? EAGAIN : ENODEV);
 }
 
 /// Scan for connected devices.

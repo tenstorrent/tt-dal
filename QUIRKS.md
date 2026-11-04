@@ -6,10 +6,15 @@ implementation, not part of any function's contract.
 
 ## Device scan bound
 
-`tt_dev_from_bdf()` matches against an internal scan buffer of 64 devices,
-so a matching device beyond the first 64 is missed and reports `ENODEV`.
-The bound comfortably exceeds the device count of any current system. File
-a bug if your deployment approaches it.
+`tt_dev_from_bdf()` matches against an internal scan buffer of 64 devices, so a
+matching device beyond the first 64 is missed and the lookup fails as if it were
+absent. The bound comfortably exceeds the device count of any current system.
+File a bug if your deployment approaches it.
+
+## Skipped devices in address lookup
+
+`tt_dev_from_bdf()` skips each device it cannot open, so a caller without
+permission to open any device node sees `ENODEV`.
 
 ## SMC poll cadence
 

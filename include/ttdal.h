@@ -141,7 +141,8 @@ tt_fw_version(const tt_session_t *sess, tt_version_t *version);
  *                requires.
  * * `ENODEV`     No such device (normalized from device lookups, and from an
  *                open that finds no device).
- * * `EAGAIN`     Device held by another client (non-blocking open).
+ * * `EAGAIN`     Device held incompatibly (non-blocking open), or held
+ *                exclusively by any client during a device lookup.
  * * `ECONNRESET` Device connection reset. The session was severed by an
  *                out-of-band reset or removal (normalized from `ENODEV` on
  *                session operations). Reopening recovers the session after a
@@ -276,9 +277,14 @@ typedef struct tt_session {
 /// Create device from a PCIe bus/device/function (BDF) address.
 ///
 /// Scans connected devices and initializes the descriptor for the device
-/// matching the given BDF. Accepts `DDDD:BB:DD.F` or
-/// `BB:DD.F` format. Each
+/// matching the given BDF. Accepts `DDDD:BB:DD.F` or `BB:DD.F` format. Each
 /// scanned device is briefly opened to read and compare its BDF.
+///
+/// The opens do not wait for an exclusive holder. A device held exclusively
+/// (e.g. during `tt_reset()` or a flash sequence) cannot be read, so it is
+/// skipped. When no device matches and at least one was skipped, the call fails
+/// with `EAGAIN`, since a skipped device may be the one sought. It is safe to
+/// retry once the holder releases the device.
 ///
 /// Must call `tt_open()` to obtain a session before using the device.
 ///
@@ -290,6 +296,8 @@ typedef struct tt_session {
 ///
 /// * `EINVAL`     `addr` or `dev` is `NULL`, or `addr` is malformed.
 /// * `ENODEV`     No device matches the address.
+/// * `EAGAIN`     No device matches, and a device held exclusively, by another
+///                client or by the caller, could not be checked.
 ///
 /// @par Example
 ///
