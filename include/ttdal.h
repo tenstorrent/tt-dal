@@ -398,8 +398,9 @@ tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags);
 
 /// Close a session handle.
 ///
-/// Releases the file descriptor and invalidates the handle. After this call,
-/// `sess->fd` is `-1`. Idempotent, so closing an already-closed session is a
+/// Releases the file descriptor and invalidates the handle. The descriptor is
+/// released even when the call reports an error, so after this call `sess->fd`
+/// is `-1` either way. Idempotent, so closing an already-closed session is a
 /// no-op.
 ///
 /// @param sess  Session handle.

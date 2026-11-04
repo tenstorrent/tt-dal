@@ -229,7 +229,8 @@ impl Session {
 
     /// Closes the session explicitly.
     ///
-    /// Idempotent, so closing an already-closed session is a no-op.
+    /// Idempotent, so closing an already-closed session is a no-op. The session
+    /// is closed even when this raises.
     ///
     /// Raises `TTError` carrying any `errno` left by the failing `close(2)`.
     pub fn close(&mut self) -> PyResult<()> {
