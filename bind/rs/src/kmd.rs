@@ -11,16 +11,15 @@ use crate::{Result, err, ffi};
 
 /// Returns the kernel driver version.
 ///
-/// Discovers and briefly opens an available device to issue the query.
+/// Reads the version the kernel publishes for the loaded module, so it opens no
+/// device, and succeeds while every device is held or none is connected.
 ///
 /// # Errors
 ///
-/// Returns [`ConnectionReset`] if the device was reset or removed while
-/// querying. Returns `ENODEV`, observable via [`Error::raw_os_error()`], if
-/// no device is available. Other `errno` values from the failing `ioctl`
-/// propagate unchanged.
+/// Returns `ENODEV`, observable via [`Error::raw_os_error()`], if the driver is
+/// not loaded, or `EIO` if the version string is empty or malformed. Other
+/// `errno` values from the failing system call propagate unchanged.
 ///
-/// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
 /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
 pub fn version() -> Result<Version> {
     let mut raw = std::mem::MaybeUninit::<ffi::tt_version_t>::uninit();

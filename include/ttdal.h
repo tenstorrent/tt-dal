@@ -79,8 +79,10 @@ typedef struct tt_version {
 /// Get the KMD version.
 ///
 /// The kernel-mode driver (KMD) version is a property of the kernel module, not
-/// a specific device. This function discovers an available device, queries the
-/// version through it, and closes it before returning.
+/// a specific device. This function reads the version the kernel publishes for
+/// the loaded module, so it opens no device, and succeeds while every device is
+/// held or none is connected. A pre-release suffix, such as `-rc1`, fills the
+/// pre-release identifier.
 ///
 /// @param[out] version  KMD version output.
 /// @return              0 on success, -1 on error (check `errno`).
@@ -88,8 +90,8 @@ typedef struct tt_version {
 /// @par Errors
 ///
 /// * `EINVAL`     `version` is `NULL`.
-/// * `ENODEV`     No device is available.
-/// * `ECONNRESET` The device was reset or removed out-of-band.
+/// * `ENODEV`     The KMD is not loaded.
+/// * `EIO`        The version string was empty or malformed.
 ///
 /// Other codes propagate from the failing system call.
 [[nodiscard]] int tt_kmd_version(tt_version_t *version);

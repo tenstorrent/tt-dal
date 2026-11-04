@@ -3,55 +3,74 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "err.h"
-#include "ioctl.h"
 #include "ttdal.h"
 
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdio.h>
-#include <sys/ioctl.h>
+#include <string.h>
 #include <unistd.h>
 
 /// Get KMD version.
 ///
-/// Discovers the first available device, issues the driver info `ioctl` through
-/// it, then closes it.
+/// Reads the version string the kernel publishes for the loaded module, so no
+/// device is opened.
 int tt_kmd_version(tt_version_t *version) {
     // Validate args
     if (!version)
         return tt_fail(EINVAL);
 
-    // Use first available device.
+    // Read version string.
     //
-    // Driver version is global to the kernel module, so any open `fd`
-    // suffices to issue the query.
-    tt_device_t dev;
-    ssize_t found = tt_dev_scan(1, &dev);
-    if (found < 0)
-        return TT_ERR;
-    if (found == 0)
-        return tt_fail(ENODEV);
-    tt_session_t sess;
-    if (tt_open(&dev, &sess, 0) < 0)
-        return TT_ERR;
+    // The kernel creates this attribute from the module's `MODULE_VERSION`, and
+    // removes it when the module is unloaded.
+    int fd = open("/sys/module/tenstorrent/version", O_RDONLY | O_CLOEXEC);
+    if (fd < 0)
+        return tt_fail(errno == ENOENT ? ENODEV : errno);
 
-    // Query driver info
-    struct tenstorrent_get_driver_info query = {
-        .in.output_size_bytes = sizeof(query.out),
-    };
-    int res = ioctl(sess.fd, TENSTORRENT_IOCTL_GET_DRIVER_INFO, &query);
-    int err = errno; // saved before `tt_close` can clobber it
-    (void)tt_close(&sess);
-    if (res != 0)
-        return tt_fail_io(err);
+    char buf[64];
+    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+    int err   = (n < 0) ? errno : EIO; // an empty read has no OS cause
+    close(fd);
+    if (n <= 0)
+        return tt_fail(err);
+    buf[n] = '\0';
+
+    // Parse "major.minor.patch"
+    tt_version_t out = {};
+    int len          = 0;
+    if (sscanf(
+            buf,
+            "%" SCNu64 ".%" SCNu64 ".%" SCNu64 "%n",
+            &out.major,
+            &out.minor,
+            &out.patch,
+            &len
+        ) != 3)
+        return tt_fail(EIO);
+
+    // Parse "-pre" suffix
+    const char *rest = buf + len;
+    if (*rest == '-') {
+        rest++;
+        size_t pre = strspn(
+            rest,
+            "0123456789"
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "abcdefghijklmnopqrstuvwxyz"
+            "-."
+        );
+        if (pre == 0 || pre >= sizeof(out.pre))
+            return tt_fail(EIO);
+        memcpy(out.pre, rest, pre);
+        rest += pre;
+    }
+    if (strcmp(rest, "\n") != 0 && *rest != '\0')
+        return tt_fail(EIO);
 
     // Fill output
-    *version = (tt_version_t){
-        .major = query.out.driver_version_major,
-        .minor = query.out.driver_version_minor,
-        .patch = query.out.driver_version_patch,
-    };
+    *version = out;
 
     return TT_OK;
 }
