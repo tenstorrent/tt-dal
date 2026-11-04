@@ -139,7 +139,8 @@ tt_fw_version(const tt_session_t *sess, tt_version_t *version);
  * * `ENOTCONN`   Session is not open.
  * * `EPERM`      Session lacks the exclusive access an unforced reset
  *                requires.
- * * `ENODEV`    No such device (normalized from device lookups).
+ * * `ENODEV`     No such device (normalized from device lookups, and from an
+ *                open that finds no device).
  * * `EAGAIN`     Device held by another client (non-blocking open).
  * * `ECONNRESET` Device connection reset. The session was severed by an
  *                out-of-band reset or removal (normalized from `ENODEV` on
@@ -378,9 +379,12 @@ typedef enum tt_open_flag {
 /// @par Errors
 ///
 /// * `EINVAL`     `dev` or `sess` is `NULL`, or `flags` contains unknown bits.
-/// * `ENODEV`     The device could not be opened.
+/// * `ENODEV`     The device does not exist.
+/// * `EACCES`     The caller may not open the device node.
 /// * `EAGAIN`     `TT_OPEN_NONBLOCK` is set and another client holds the device
 ///                incompatibly.
+///
+/// Other codes propagate from the failing system call.
 [[nodiscard]] int
 tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags);
 
@@ -419,9 +423,12 @@ tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags);
 /// @par Errors
 ///
 /// * `EINVAL`     `sess` is `NULL`.
-/// * `ENODEV`     The device could not be reopened.
+/// * `ENODEV`     The device does not exist.
+/// * `EACCES`     The caller may not open the device node.
 /// * `EAGAIN`     The session was opened with `TT_OPEN_NONBLOCK` and another
 ///                client holds the device incompatibly.
+///
+/// Other codes propagate from the failing system call.
 [[nodiscard]] int tt_reopen(tt_session_t *sess);
 
 /// Device information.
@@ -989,6 +996,7 @@ typedef enum tt_reset_flag {
 ///
 /// * `EINVAL`          `dev` is `NULL`, or `flags` contains unknown bits.
 /// * `ENODEV`          The device does not exist.
+/// * `EACCES`          The caller may not open the device node.
 /// * `EAGAIN`          Another client holds the device open, or holds it
 ///                     with `TT_OPEN_EXCL` when `TT_RESET_FORCE` is set.
 /// * `ECONNRESET`      The device was reset or removed out-of-band.

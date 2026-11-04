@@ -108,9 +108,12 @@ impl Device {
     ///
     /// Raises `TTError` with:
     ///
-    /// - `ENODEV` if the device could not be opened.
+    /// - `ENODEV` if the device does not exist.
+    /// - `EACCES` if the caller may not open the device node.
     /// - `EAGAIN` if `nonblocking` is set and another client holds the
     ///   device incompatibly.
+    ///
+    /// Other `errno` values propagate from the failing system call.
     ///
     /// A blocking open waits for as long as the other client holds the device,
     /// so this releases the interpreter lock while it waits.
@@ -235,9 +238,12 @@ impl Session {
     ///
     /// Raises `TTError` with:
     ///
-    /// - `ENODEV` if the device could not be reopened.
+    /// - `ENODEV` if the device does not exist.
+    /// - `EACCES` if the caller may not open the device node.
     /// - `EAGAIN` if the session was opened with `nonblocking` and another
     ///   client holds the device incompatibly.
+    ///
+    /// Other `errno` values propagate from the failing system call.
     ///
     /// A blocking reopen waits for as long as another client holds the device,
     /// so this releases the interpreter lock while it waits.

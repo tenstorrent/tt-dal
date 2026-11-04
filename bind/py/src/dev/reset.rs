@@ -94,6 +94,7 @@ impl Device {
     /// Raises `TTError` with:
     ///
     /// - `ENODEV` if the device does not exist.
+    /// - `EACCES` if the caller may not open the device node.
     /// - `EAGAIN` if any client (including this process) has the device open,
     ///   or, with `force` set, if any client holds it exclusively.
     /// - `ECONNRESET` if the device was reset or removed out-of-band.

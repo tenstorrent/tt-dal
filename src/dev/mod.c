@@ -198,10 +198,13 @@ int tt_open(const tt_device_t *dev, tt_session_t *sess, uint16_t flags) {
     if (flags & TT_OPEN_NONBLOCK)
         oflags |= O_NONBLOCK;
 
-    // Open device
+    // Open device.
+    //
+    // A missing node and a node with no device behind it both mean the device
+    // does not exist, so they report `ENODEV`.
     int fd = open(path, oflags);
     if (fd < 0)
-        return tt_fail(errno == EAGAIN ? EAGAIN : ENODEV);
+        return tt_fail(errno == ENOENT || errno == ENXIO ? ENODEV : errno);
 
     // Initialize session
     *sess = (tt_session_t){ .dev = *dev, .fd = fd, .flags = flags };
