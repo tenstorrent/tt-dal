@@ -111,7 +111,8 @@ impl Device {
     ///
     /// Returns [`WouldBlock`] if any client (including this process) has the
     /// device open, or, with [`force`][force] set, if any client holds it
-    /// exclusively. Returns [`ConnectionReset`] if the device was reset or
+    /// exclusively. Returns [`PermissionDenied`] if the caller may not open the
+    /// device node. Returns [`ConnectionReset`] if the device was reset or
     /// removed out-of-band, or [`TimedOut`] if the reset did not complete in
     /// time. Returns `ENODEV` if the device is absent, `EBUSY` if a TLB window
     /// on the device is exported as a dma-buf, `EIO` if the ASIC reset trigger
@@ -131,6 +132,7 @@ impl Device {
     ///
     /// [force]: ResetOptions::force
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
+    /// [`PermissionDenied`]: std::io::ErrorKind::PermissionDenied
     /// [`ConnectionReset`]: std::io::ErrorKind::ConnectionReset
     /// [`TimedOut`]: std::io::ErrorKind::TimedOut
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error

@@ -157,7 +157,12 @@ normalized from device lookups), `EIO` (device I/O failed, also raised for
 driver soft-failures), `ETIMEDOUT` (reset or message exchange timed out), and
 `ENOTSUP` (unsupported device architecture).
 
-One value is normalized rather than propagated: a session operation that
+Opening a device reports `ENODEV` when the device does not exist, whether its
+node is missing (`ENOENT`) or has no device behind it (`ENXIO`). Every other
+open failure keeps its own code, so a caller without permission to open the node
+sees `EACCES` or `EPERM`.
+
+One more value is normalized rather than propagated: a session operation that
 fails with `ENODEV` had its descriptor invalidated by an out-of-band reset
 or removal, which reports as `ECONNRESET`. A telemetry read whose window is
 zapped mid-operation reports the same. The normalization is sound because

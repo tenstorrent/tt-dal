@@ -246,9 +246,12 @@ impl Session {
     ///
     /// # Errors
     ///
+    /// Returns [`PermissionDenied`] if the caller may not open the device node.
     /// Returns `ENODEV`, observable via [`Error::raw_os_error()`], if the
-    /// device does not exist.
+    /// device does not exist. Other `errno` values from the failing `open`
+    /// propagate unchanged.
     ///
+    /// [`PermissionDenied`]: std::io::ErrorKind::PermissionDenied
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn open(dev: Device) -> Result<Self> {
         Self::options().open(dev)
@@ -292,12 +295,15 @@ impl Session {
     /// # Errors
     ///
     /// Returns [`WouldBlock`] if the session was opened with [`nonblocking`]
-    /// and another client holds the device incompatibly. Returns `ENODEV`,
-    /// observable via [`Error::raw_os_error()`], if the device could not be
-    /// reopened.
+    /// and another client holds the device incompatibly, or
+    /// [`PermissionDenied`] if the caller may not open the device node. Returns
+    /// `ENODEV`, observable via [`Error::raw_os_error()`], if the device does
+    /// not exist. Other `errno` values from the failing `open` propagate
+    /// unchanged.
     ///
     /// [`nonblocking`]: OpenOptions::nonblocking
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
+    /// [`PermissionDenied`]: std::io::ErrorKind::PermissionDenied
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn reopen(&mut self) -> Result<()> {
         // SAFETY: The handle behind `as_mut_ptr` is a valid, initialized
@@ -410,10 +416,13 @@ impl OpenOptions {
     /// # Errors
     ///
     /// Returns [`WouldBlock`] if [`nonblocking`] is set and another client
-    /// holds the device incompatibly. Returns `ENODEV`, observable via
-    /// [`Error::raw_os_error()`], if the device does not exist.
+    /// holds the device incompatibly, or [`PermissionDenied`] if the caller may
+    /// not open the device node. Returns `ENODEV`, observable via
+    /// [`Error::raw_os_error()`], if the device does not exist. Other `errno`
+    /// values from the failing `open` propagate unchanged.
     ///
     /// [`WouldBlock`]: std::io::ErrorKind::WouldBlock
+    /// [`PermissionDenied`]: std::io::ErrorKind::PermissionDenied
     /// [`nonblocking`]: Self::nonblocking
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn open(&self, dev: Device) -> Result<Session> {
