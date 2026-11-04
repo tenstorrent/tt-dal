@@ -244,7 +244,8 @@ int tt_reopen(tt_session_t *sess) {
 
 /// Close a session.
 ///
-/// Closes `fd` if open. NOP if `fd < 0`. Sets `fd` to `-1` on success.
+/// Closes `fd` if open. NOP if `fd < 0`. Sets `fd` to `-1` even when the close
+/// fails, as the descriptor is released either way.
 int tt_close(tt_session_t *sess) {
     // Validate args
     if (!sess)
@@ -255,14 +256,18 @@ int tt_close(tt_session_t *sess) {
         return TT_OK;
 
     // Close `fd`
-    if (close(sess->fd) != 0)
-        return TT_ERR;
+    int rc = close(sess->fd);
 
     // Sentinel `fd`.
     //
-    // Guards against double-close and use-after-close without requiring
-    // callers to track open state separately.
+    // Guards against double-close and use-after-close without requiring callers
+    // to track open state separately. Set even when `close(2)` fails, because
+    // the kernel releases the descriptor regardless, and closing the number
+    // again could close an unrelated file that reused it.
     sess->fd = -1;
+
+    if (rc != 0)
+        return TT_ERR;
 
     return TT_OK;
 }
