@@ -189,8 +189,7 @@ impl Session {
     /// send again.
     ///
     /// This releases the interpreter lock while it waits, so other threads run
-    /// during the exchange. A persistent session does not reopen for messaging
-    /// the way other calls do, since reopening would discard the message.
+    /// during the exchange.
     ///
     /// Raises `TTError` with `ENOTCONN` if the session has been closed, with
     /// `EINVAL` if the driver is older than `tt-kmd` 2.11, or with `ETIMEDOUT`,

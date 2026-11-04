@@ -64,23 +64,20 @@ impl Session {
         }
         let flags = flags as u16;
 
-        self.perform(|sess| {
-            // The raw pointer cannot cross threads, so pass its address.
-            let sess = sess as usize;
-            let (rc, errno) = py.detach(move || {
-                // SAFETY: `sess` is a valid session handle, and `tt_reset_with`
-                // leaves it open, so the fd stays owned by `self`.
-                let rc = unsafe { ffi::tt_reset_with(sess as *const ffi::tt_session_t, flags) };
-                // Read here, before reattaching can clobber it.
-                let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
-                (rc, errno)
-            });
-            if rc != 0 {
-                crate::err::restore(errno);
-                return Err(crate::err::fail(errno));
-            }
-            Ok(())
-        })
+        // The raw pointer cannot cross threads, so pass its address.
+        let sess = self.as_ptr() as usize;
+        let (rc, errno) = py.detach(move || {
+            // SAFETY: `sess` is a valid session handle, and `tt_reset_with`
+            // leaves it open, so the fd stays owned by `self`.
+            let rc = unsafe { ffi::tt_reset_with(sess as *const ffi::tt_session_t, flags) };
+            // Read here, before reattaching can clobber it.
+            let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+            (rc, errno)
+        });
+        if rc != 0 {
+            return Err(crate::err::fail(errno));
+        }
+        Ok(())
     }
 }
 

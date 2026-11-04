@@ -106,15 +106,6 @@ impl Device {
     /// `nonblocking` is set. Set `exclusive` to wait for sole access, then
     /// block other opens for the session's lifetime.
     ///
-    /// Set `persistent` to transparently reopen the session and retry the
-    /// failing operation when the device connection is lost to an
-    /// out-of-band reset or removal. A device that is truly gone surfaces
-    /// as the reopen's `ENODEV`, never as `ECONNRESET`, and a connection
-    /// that keeps resetting is retried a bounded number of times before
-    /// reporting `ENODEV` as well. Ensure each `Tlb` is freed before a reopen,
-    /// as the new descriptor may be handed the same TLB IDs, which a stale
-    /// `Tlb` would then free or rebind.
-    ///
     /// Raises `TTError` with:
     ///
     /// - `ENODEV` if the device could not be opened.
@@ -123,14 +114,8 @@ impl Device {
     ///
     /// A blocking open waits for as long as the other client holds the device,
     /// so this releases the interpreter lock while it waits.
-    #[pyo3(signature = (*, exclusive = false, nonblocking = false, persistent = false))]
-    pub fn open(
-        &self,
-        py: Python<'_>,
-        exclusive: bool,
-        nonblocking: bool,
-        persistent: bool,
-    ) -> PyResult<Session> {
+    #[pyo3(signature = (*, exclusive = false, nonblocking = false))]
+    pub fn open(&self, py: Python<'_>, exclusive: bool, nonblocking: bool) -> PyResult<Session> {
         let mut flags = 0;
         if exclusive {
             flags |= ffi::TT_OPEN_EXCL;
@@ -160,7 +145,6 @@ impl Device {
             // SAFETY: `sess` was fully initialized by the successful call
             // above.
             raw: unsafe { sess.assume_init() },
-            persist: persistent,
         })
     }
 
@@ -179,8 +163,6 @@ impl Device {
 pub struct Session {
     /// Underlying session handle.
     raw: ffi::tt_session_t,
-    /// Whether the session reopens on a lost device connection.
-    persist: bool,
 }
 
 impl Session {
@@ -205,33 +187,6 @@ impl Session {
     /// Returns a mutable raw pointer to the underlying session handle.
     pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::tt_session_t {
         &raw mut self.raw
-    }
-
-    /// Runs a device operation, reopening a persistent session when the
-    /// device connection was lost.
-    pub(crate) fn perform<T>(
-        &mut self,
-        mut op: impl FnMut(*const ffi::tt_session_t) -> PyResult<T>,
-    ) -> PyResult<T> {
-        /// Reopen attempts before a persistent session gives up.
-        const RETRIES: u32 = 3;
-
-        let mut res = op(&raw const self.raw);
-        if self.persist {
-            for _ in 0..RETRIES {
-                if !(res.is_err() && crate::err::lost()) {
-                    return res;
-                }
-                Python::attach(|py| self.reopen(py))?;
-                res = op(&raw const self.raw);
-            }
-            if res.is_err() && crate::err::lost() {
-                // The connection keeps resetting, so report the device as
-                // unusable rather than inviting another retry.
-                return Err(crate::err::fail(libc::ENODEV));
-            }
-        }
-        res
     }
 }
 
@@ -276,9 +231,7 @@ impl Session {
     /// survive it, and any requested power state is dropped with the old
     /// descriptor. Ensure each TLB allocated through the session is freed
     /// first, as the new descriptor may be handed the same TLB IDs, which a
-    /// stale `Tlb` would then free or rebind. A persistent session reopens on
-    /// its own, so calling this is only necessary for a session opened without
-    /// `persistent`.
+    /// stale TLB would then free or rebind.
     ///
     /// Raises `TTError` with:
     ///
@@ -325,17 +278,14 @@ impl Session {
     ///   reset or removal.
     ///
     /// Other `errno` values propagate from the failing system call.
-    pub fn info(&mut self) -> PyResult<Info> {
-        self.perform(|sess| {
-            // SAFETY: Zeroing tt_dev_info_t is valid. All fields are plain
-            // integers.
-            let mut info: ffi::tt_dev_info_t = unsafe { std::mem::zeroed() };
-            info.output_size_bytes = std::mem::size_of::<ffi::tt_dev_info_t>() as u32;
-            // SAFETY: `sess` is an open session and info is a valid
-            // out-pointer.
-            crate::err::check(unsafe { ffi::tt_dev_info(sess, &mut info) })?;
-            Ok(Info(info))
-        })
+    pub fn info(&self) -> PyResult<Info> {
+        // SAFETY: Zeroing tt_dev_info_t is valid. All fields are plain
+        // integers.
+        let mut info: ffi::tt_dev_info_t = unsafe { std::mem::zeroed() };
+        info.output_size_bytes = std::mem::size_of::<ffi::tt_dev_info_t>() as u32;
+        // SAFETY: `self` is an open session and info is a valid out-pointer.
+        crate::err::check(unsafe { ffi::tt_dev_info(self.as_ptr(), &mut info) })?;
+        Ok(Info(info))
     }
 
     fn __repr__(&self) -> String {
