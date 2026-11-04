@@ -117,7 +117,6 @@ int tt_smc_wait(const tt_session_t *sess, tt_smc_msg_t *rsp, uint32_t timeout) {
     //
     // The controller usually answers well inside a millisecond, so the first
     // polls run back to back before falling back to sleeping between them.
-    uint64_t budget = timeout ? timeout : TT_SMC_TIMEOUT_DEFAULT;
     struct timespec start;
     clock_gettime(CLOCK_MONOTONIC, &start);
     for (unsigned spins = 0;; spins++) {
@@ -129,7 +128,7 @@ int tt_smc_wait(const tt_session_t *sess, tt_smc_msg_t *rsp, uint32_t timeout) {
             return TT_ERR;
 
         // Give up once the poll budget is spent.
-        if (elapsed_ms(&start) >= budget)
+        if (elapsed_ms(&start) >= timeout)
             return tt_fail(ETIMEDOUT);
 
         if (spins >= SPIN_POLLS)
