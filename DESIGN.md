@@ -420,8 +420,9 @@ reopening once the reset returns.
 
 > [!NOTE]
 >
-> While an unforced reset (or any future exclusive holder, e.g. a flasher)
-> holds the device, all other opens block until it is released, and the
+> While an unforced reset (or any future exclusive holder, e.g. a flasher) holds
+> the device, every blocking open waits until it is released, and a non-blocking
+> open, including the library's own device lookups, fails with `EAGAIN`. The
 > kernel provides no bypass. Recovery from a hung exclusive holder is
 > out-of-band (sysfs remove, BMC) and beyond this library.
 
