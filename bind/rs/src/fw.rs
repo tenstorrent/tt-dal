@@ -20,14 +20,12 @@ use crate::{Result, err, ffi};
 ///
 /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
 pub fn version(dev: &Session) -> Result<Version> {
-    dev.perform(|sess| {
-        let mut raw = std::mem::MaybeUninit::<ffi::tt_version_t>::uninit();
-        // SAFETY: `sess` is an open device and `raw` is a valid out-pointer
-        // for `tt_version_t`.
-        err::check(unsafe { ffi::tt_fw_version(sess.as_ptr(), raw.as_mut_ptr()) })?;
-        // SAFETY: `raw` was fully initialized by the successful call above.
-        Ok(from_raw(unsafe { raw.assume_init() }))
-    })
+    let mut raw = std::mem::MaybeUninit::<ffi::tt_version_t>::uninit();
+    // SAFETY: `dev` is an open session and `raw` is a valid out-pointer for
+    // `tt_version_t`.
+    err::check(unsafe { ffi::tt_fw_version(dev.as_ptr(), raw.as_mut_ptr()) })?;
+    // SAFETY: `raw` was fully initialized by the successful call above.
+    Ok(from_raw(unsafe { raw.assume_init() }))
 }
 
 #[cfg(test)]

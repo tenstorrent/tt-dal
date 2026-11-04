@@ -118,50 +118,48 @@ impl Session {
     /// [`Unsupported`]: std::io::ErrorKind::Unsupported
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn telemetry(&self) -> Result<Telemetry> {
-        self.perform(|sess| {
-            // Grow-and-retry until all entries fit.
-            //
-            // `tt_telemetry` returns the total entry count even when it exceeds
-            // `cap`. If that happens, set the new cap to twice the observed
-            // count and retry.
-            let mut cap = 128usize;
-            let mut buf = Vec::<ffi::tt_telemetry_t>::with_capacity(cap);
+        // Grow-and-retry until all entries fit.
+        //
+        // `tt_telemetry` returns the total entry count even when it exceeds
+        // `cap`. If that happens, set the new cap to twice the observed count
+        // and retry.
+        let mut cap = 128usize;
+        let mut buf = Vec::<ffi::tt_telemetry_t>::with_capacity(cap);
 
-            // Iterate until all entries read
-            let len = loop {
-                // Ensure buffer allocation is large enough
-                buf.reserve(cap);
+        // Iterate until all entries read
+        let len = loop {
+            // Ensure buffer allocation is large enough
+            buf.reserve(cap);
 
-                // SAFETY: `sess` is an open device, and `buf` has capacity
-                // for at least `cap` elements, so `buf.as_mut_ptr()` is valid
-                // for writes of `cap` `tt_telemetry_t`s.
-                let found = unsafe { ffi::tt_telemetry(sess.as_ptr(), cap, buf.as_mut_ptr()) };
+            // SAFETY: `self` is an open device, and `buf` has capacity for at
+            // least `cap` elements, so `buf.as_mut_ptr()` is valid for writes
+            // of `cap` `tt_telemetry_t`s.
+            let found = unsafe { ffi::tt_telemetry(self.as_ptr(), cap, buf.as_mut_ptr()) };
 
-                // Check if capacity was large enough for the table
-                match usize::try_from(found) {
-                    // Read failed, report error.
-                    Err(_) => return Err(Error::last_error()),
-                    // All entries fit in buffer.
-                    Ok(len) if len <= cap => break len,
-                    // Too small, grow and retry.
-                    Ok(len) => cap = len * 2,
-                }
-            };
+            // Check if capacity was large enough for the table
+            match usize::try_from(found) {
+                // Read failed, report error.
+                Err(_) => return Err(Error::last_error()),
+                // All entries fit in buffer.
+                Ok(len) if len <= cap => break len,
+                // Too small, grow and retry.
+                Ok(len) => cap = len * 2,
+            }
+        };
 
-            // SAFETY: `len` holds the exact number of entries initialized by
-            // `tt_telemetry` and does not exceed the allocated capacity.
-            unsafe { buf.set_len(len) };
+        // SAFETY: `len` holds the exact number of entries initialized by
+        // `tt_telemetry` and does not exceed the allocated capacity.
+        unsafe { buf.set_len(len) };
 
-            // Convert each raw entry
-            let entries = buf
-                .into_iter()
-                .map(|entry| Entry {
-                    tag: entry.tag,
-                    raw: entry.raw,
-                })
-                .collect();
-            Ok(Telemetry(entries))
-        })
+        // Convert each raw entry
+        let entries = buf
+            .into_iter()
+            .map(|entry| Entry {
+                tag: entry.tag,
+                raw: entry.raw,
+            })
+            .collect();
+        Ok(Telemetry(entries))
     }
 }
 

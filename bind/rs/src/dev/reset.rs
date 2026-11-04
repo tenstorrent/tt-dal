@@ -93,12 +93,9 @@ impl Session {
     /// [`TimedOut`]: std::io::ErrorKind::TimedOut
     /// [`Error::raw_os_error()`]: crate::Error::raw_os_error
     pub fn reset(&mut self, opts: &ResetOptions) -> Result<()> {
-        let flags = opts.flags();
-        self.perform(|sess| {
-            // SAFETY: `sess` is a valid session handle, and `tt_reset_with`
-            // leaves it open.
-            err::check(unsafe { ffi::tt_reset_with(sess.as_ptr(), flags) })
-        })
+        // SAFETY: `self` is a valid session handle, and `tt_reset_with` leaves
+        // it open.
+        err::check(unsafe { ffi::tt_reset_with(self.as_ptr(), opts.flags()) })
     }
 }
 
