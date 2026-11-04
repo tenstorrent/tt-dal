@@ -11,12 +11,13 @@ use crate::ver::raw_to_semver;
 
 /// Returns the kernel driver version.
 ///
-/// Discovers and briefly opens an available device to issue the query.
+/// Reads the version the kernel publishes for the loaded module, so it opens no
+/// device, and succeeds while every device is held or none is connected.
 ///
 /// Raises `TTError` with:
 ///
-/// - `ENODEV` if no device is available.
-/// - `ECONNRESET` if the device was reset or removed while querying.
+/// - `ENODEV` if the driver is not loaded.
+/// - `EIO` if the version string is empty or malformed.
 ///
 /// Other `errno` values propagate from the failing system call.
 #[pyfunction]
