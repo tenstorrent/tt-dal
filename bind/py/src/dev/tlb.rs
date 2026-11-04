@@ -410,19 +410,20 @@ impl Session {
     ///
     /// Other `errno` values propagate from the failing system call.
     pub fn alloc(
-        mut slf: PyRefMut<'_, Self>,
+        slf: PyRef<'_, Self>,
         size: Size,
         caching: Caching,
         py: Python<'_>,
     ) -> PyResult<Tlb> {
-        let raw = slf.perform(|sess| {
-            let mut raw = MaybeUninit::<ffi::tt_tlb_t>::uninit();
-            // SAFETY: `sess` is an open device and raw is a valid out-pointer.
-            crate::err::check(unsafe {
-                ffi::tt_tlb_alloc(sess, size.as_raw(), caching.as_raw(), raw.as_mut_ptr())
-            })?;
-            // SAFETY: `raw` was fully initialized by the successful call above.
-            Ok(unsafe { raw.assume_init() })
+        let mut raw = MaybeUninit::<ffi::tt_tlb_t>::uninit();
+        // SAFETY: `slf` is an open session and raw is a valid out-pointer.
+        crate::err::check(unsafe {
+            ffi::tt_tlb_alloc(
+                Session::as_ptr(&slf),
+                size.as_raw(),
+                caching.as_raw(),
+                raw.as_mut_ptr(),
+            )
         })?;
         // SAFETY: `slf.as_ptr()` is a borrowed Python object pointer.
         // from_borrowed_ptr increments the refcount to give us an owned
@@ -434,7 +435,8 @@ impl Session {
                 .unbind()
         };
         Ok(Tlb {
-            raw,
+            // SAFETY: `raw` was fully initialized by the successful call above.
+            raw: unsafe { raw.assume_init() },
             sess,
             freed: false,
         })

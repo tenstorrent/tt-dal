@@ -186,31 +186,29 @@ impl Session {
     /// - `ENOTSUP` if the device architecture is unsupported.
     ///
     /// Other `errno` values propagate from the failing system call.
-    pub fn telemetry(&mut self) -> PyResult<Telemetry> {
-        self.perform(|sess| {
-            // Grow-and-retry until all entries fit. `tt_telemetry` returns the
-            // total count even when it exceeds cap, so retry with twice that.
-            let mut cap = 128usize;
-            let mut buf: Vec<ffi::tt_telemetry_t> = Vec::new();
+    pub fn telemetry(&self) -> PyResult<Telemetry> {
+        // Grow-and-retry until all entries fit. `tt_telemetry` returns the
+        // total count even when it exceeds cap, so retry with twice that.
+        let mut cap = 128usize;
+        let mut buf: Vec<ffi::tt_telemetry_t> = Vec::new();
 
-            let len = loop {
-                buf.reserve(cap);
-                // SAFETY: `sess` is an open device and `buf` has capacity for
-                // at least cap elements.
-                let found = unsafe { ffi::tt_telemetry(sess, cap, buf.as_mut_ptr()) };
-                match usize::try_from(found) {
-                    Err(_) => return Err(crate::err::check(-1).unwrap_err()),
-                    Ok(len) if len <= cap => break len,
-                    Ok(len) => cap = len * 2,
-                }
-            };
+        let len = loop {
+            buf.reserve(cap);
+            // SAFETY: `self` is an open device and `buf` has capacity for at
+            // least cap elements.
+            let found = unsafe { ffi::tt_telemetry(self.as_ptr(), cap, buf.as_mut_ptr()) };
+            match usize::try_from(found) {
+                Err(_) => return Err(crate::err::check(-1).unwrap_err()),
+                Ok(len) if len <= cap => break len,
+                Ok(len) => cap = len * 2,
+            }
+        };
 
-            // SAFETY: `len` elements were initialized by tt_telemetry.
-            unsafe { buf.set_len(len) };
-            let entries = buf.into_iter().map(|entry| (entry.tag, entry.raw));
-            Ok(Telemetry {
-                entries: entries.collect(),
-            })
+        // SAFETY: `len` elements were initialized by tt_telemetry.
+        unsafe { buf.set_len(len) };
+        let entries = buf.into_iter().map(|entry| (entry.tag, entry.raw));
+        Ok(Telemetry {
+            entries: entries.collect(),
         })
     }
 }
