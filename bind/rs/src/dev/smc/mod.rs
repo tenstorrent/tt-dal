@@ -46,11 +46,13 @@ impl Session {
     /// Calls the SMC controller with a message and returns the reply.
     ///
     /// Posts the message, then blocks until the reply arrives or `timeout`
-    /// elapses. `None` uses the driver default. Success means the exchange
-    /// completed, not that the firmware accepted the message. Inspect
-    /// `message[0]` (the firmware status) for message-level errors. The
-    /// message is dropped on any early return, leaving the session free to
-    /// send again.
+    /// elapses. `None` uses the library default of one second. A timeout is
+    /// rounded up to whole milliseconds, so the wait is never shorter than
+    /// asked, and [`Duration::ZERO`] checks once without waiting. Success means
+    /// the exchange completed, not that the firmware accepted the message.
+    /// Inspect `message[0]` (the firmware status) for message-level errors. The
+    /// message is dropped if the wait fails, leaving the session free to send
+    /// again.
     ///
     /// # Errors
     ///

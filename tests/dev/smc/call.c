@@ -17,7 +17,7 @@ int main(void) {
     req.message[0]   = SMC_MSG_TEST;
     req.message[1]   = 0xCAFE;
     tt_smc_msg_t rsp = { 0 };
-    int rc           = tt_smc_call(sess, &req, &rsp, 0);
+    int rc           = tt_smc_call(sess, &req, &rsp, TT_SMC_TIMEOUT_DEFAULT);
     // Firmware may lack a message queue (old firmware), so skip if unavailable.
     if (rc == 0) {
         assert(rsp.message[0] == 0);      // firmware status OK

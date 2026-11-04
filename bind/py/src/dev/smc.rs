@@ -12,6 +12,8 @@
 //! `Session.call()` performs a whole exchange. `Session.post()` returns a
 //! `Queued` handle for driving one by hand.
 
+use std::time::Duration;
+
 use crate::ffi;
 use pyo3::prelude::*;
 
@@ -182,11 +184,12 @@ impl Session {
     /// Calls the SMC controller with a message and returns the reply.
     ///
     /// Posts the message, then blocks until the reply arrives or `timeout`
-    /// seconds elapse. `None` or `0` uses the driver default. Success means
-    /// the exchange completed, not that the firmware accepted the message.
-    /// Inspect `message[0]` (the firmware status) for message-level errors.
-    /// The message is dropped on any early return, leaving the session free to
-    /// send again.
+    /// seconds elapse. `None` uses the library default of one second. A timeout
+    /// is rounded up to whole milliseconds, so the wait is never shorter than
+    /// asked, and `0` checks once without waiting. Success means the exchange
+    /// completed, not that the firmware accepted the message. Inspect
+    /// `message[0]` (the firmware status) for message-level errors. The message
+    /// is dropped if the wait fails, leaving the session free to send again.
     ///
     /// This releases the interpreter lock while it waits, so other threads run
     /// during the exchange.
@@ -241,13 +244,20 @@ impl Session {
 
 /// Converts a timeout in seconds into whole milliseconds.
 ///
-/// `None` and `0` both select the driver default.
+/// `None` selects the library default. A timeout rounds up to the next whole
+/// millisecond, saturating at `u32::MAX`.
 fn millis(timeout: Option<f64>) -> PyResult<u32> {
-    let Some(secs) = timeout else { return Ok(0) };
+    let Some(secs) = timeout else {
+        return Ok(ffi::TT_SMC_TIMEOUT_DEFAULT);
+    };
     if !secs.is_finite() || secs < 0.0 {
         return Err(pyo3::exceptions::PyValueError::new_err(
             "timeout must be a non-negative number of seconds",
         ));
     }
-    Ok((secs * 1000.0).round().min(f64::from(u32::MAX)) as u32)
+    // Through `Duration`, so a value such as 0.007 converts to exactly 7 ms
+    let Ok(d) = Duration::try_from_secs_f64(secs) else {
+        return Ok(u32::MAX);
+    };
+    Ok(u32::try_from(d.as_nanos().div_ceil(1_000_000)).unwrap_or(u32::MAX))
 }

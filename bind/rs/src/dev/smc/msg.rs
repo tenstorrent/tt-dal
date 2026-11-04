@@ -56,10 +56,12 @@ impl<'sess> Queued<'sess> {
 
     /// Blocks until the reply arrives or `timeout` elapses.
     ///
-    /// `None` uses the driver default. On timeout the message is left queued,
-    /// to wait on again or drop. Success means the exchange completed, not
-    /// that the firmware accepted the message. Inspect `message[0]` (the
-    /// firmware status) for message-level errors.
+    /// `None` uses the library default of one second. A timeout is rounded up
+    /// to whole milliseconds, so the wait is never shorter than asked, and
+    /// [`Duration::ZERO`] checks once without waiting. On timeout the message
+    /// is left queued, to wait on again or drop. Success means the exchange
+    /// completed, not that the firmware accepted the message. Inspect
+    /// `message[0]` (the firmware status) for message-level errors.
     ///
     /// # Errors
     ///
@@ -130,7 +132,59 @@ impl Drop for Queued<'_> {
     }
 }
 
-/// Converts a timeout into whole milliseconds, `0` meaning the driver default.
+/// Converts a timeout into whole milliseconds.
+///
+/// `None` selects the library default. A timeout rounds up to the next whole
+/// millisecond, saturating at `u32::MAX`.
 pub(super) fn millis(timeout: Option<Duration>) -> u32 {
-    timeout.map_or(0, |d| u32::try_from(d.as_millis()).unwrap_or(u32::MAX))
+    timeout.map_or(ffi::TT_SMC_TIMEOUT_DEFAULT, |d| {
+        u32::try_from(d.as_nanos().div_ceil(1_000_000)).unwrap_or(u32::MAX)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn millis_none() {
+        assert_eq!(millis(None), ffi::TT_SMC_TIMEOUT_DEFAULT);
+    }
+
+    #[test]
+    fn millis_zero() {
+        assert_eq!(millis(Some(Duration::ZERO)), 0);
+    }
+
+    #[test]
+    fn millis_one_nano() {
+        assert_eq!(millis(Some(Duration::from_nanos(1))), 1);
+    }
+
+    #[test]
+    fn millis_under_milli() {
+        assert_eq!(millis(Some(Duration::from_micros(999))), 1);
+    }
+
+    #[test]
+    fn millis_one_milli() {
+        assert_eq!(millis(Some(Duration::from_millis(1))), 1);
+    }
+
+    #[test]
+    fn millis_rounds_up() {
+        assert_eq!(millis(Some(Duration::from_micros(1_100))), 2);
+    }
+
+    #[test]
+    fn millis_max_milli() {
+        let max = Duration::from_millis(u64::from(u32::MAX));
+        assert_eq!(millis(Some(max)), u32::MAX);
+        assert_eq!(millis(Some(max + Duration::from_millis(1))), u32::MAX);
+    }
+
+    #[test]
+    fn millis_saturates() {
+        assert_eq!(millis(Some(Duration::MAX)), u32::MAX);
+    }
 }

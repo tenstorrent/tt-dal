@@ -37,7 +37,7 @@ int main(void) {
         // The response freed the session to post the same request again, this
         // time waiting for the reply instead of polling for it.
         assert(tt_smc_post(sess, &req) == 0);
-        assert(tt_smc_wait(sess, &rsp, 0) == 0);
+        assert(tt_smc_wait(sess, &rsp, TT_SMC_TIMEOUT_DEFAULT) == 0);
         assert(rsp.message[0] == 0);
         assert(rsp.message[1] == 0xCAFF);
     }

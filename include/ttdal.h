@@ -664,8 +664,6 @@ typedef struct tt_tlb_config {
  *============================================================================*/
 
 /// Default response timeout in milliseconds.
-///
-/// Selected by passing `0` as a timeout.
 #define TT_SMC_TIMEOUT_DEFAULT 1000u
 
 /// SMC message.
@@ -696,7 +694,8 @@ typedef struct tt_smc_msg {
 /// @param sess           Session handle.
 /// @param req            SMC message to send.
 /// @param[out] rsp       Response message.
-/// @param timeout        Poll timeout in ms (`0` for `TT_SMC_TIMEOUT_DEFAULT`).
+/// @param timeout        Poll timeout in ms, such as `TT_SMC_TIMEOUT_DEFAULT`.
+///                       `0` polls once.
 /// @return               0 on success, -1 on error (check `errno`).
 ///
 /// @par Errors
@@ -786,7 +785,8 @@ tt_smc_post(const tt_session_t *sess, const tt_smc_msg_t *req);
 ///
 /// @param sess           Session handle.
 /// @param[out] rsp       Response message.
-/// @param timeout        Poll timeout in ms (`0` for `TT_SMC_TIMEOUT_DEFAULT`).
+/// @param timeout        Poll timeout in ms, such as `TT_SMC_TIMEOUT_DEFAULT`.
+///                       `0` polls once.
 /// @return               0 on success, -1 on error (check `errno`).
 ///
 /// @par Errors
