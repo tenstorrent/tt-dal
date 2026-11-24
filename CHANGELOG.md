@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0]
+
+### Bug Fixes
+
+- *(reset)* [**breaking**] Perform in-place resets
+- *(bind/rs)* [**breaking**] Reopen through mutable borrow
+- *(dev)* [**breaking**] Propagate `tt_open` errors
+- *(dev)* [**breaking**] Use non-blocking device lookups
+- *(dev)* Invalidate fd on close
+
+### Build System
+
+- *(cmake)* Support pre-1.0 semver
+
+### Documentation
+
+- Improve documentation
+
+### Features
+
+- *(reset)* [**breaking**] Support forced resets
+- *(reset)* [**breaking**] Distinguish reset failures
+- *(telem)* [**breaking**] Expose raw telemetry
+- *(ver)* [**breaking**] Query version through sysfs
+- *(smc)* [**breaking**] Rework timeout handling
+
+### Revert
+
+- *(bind/rs)* [**breaking**] Remove persistent sessions
+- *(bind/py)* [**breaking**] Remove persistent sessions
+
 ## [0.1.2]
 
 ### Bug Fixes
@@ -146,6 +177,7 @@ All notable changes to this project will be documented in this file.
 - *(cargo)* Initial tests
 - *(ctest)* Initial tests
 
+[0.2.0]: https://github.com/tenstorrent/tt-dal/compare/v0.1.2..v0.2.0
 [0.1.2]: https://github.com/tenstorrent/tt-dal/compare/v0.1.1..v0.1.2
 [0.1.1]: https://github.com/tenstorrent/tt-dal/compare/v0.1.0..v0.1.1
 [0.1.0]: https://github.com/tenstorrent/tt-dal/tree/v0.1.0
